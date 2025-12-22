@@ -1,211 +1,290 @@
-// DOM Elements
-const toggleBtn = document.getElementById("toggleBtn");
-const clearBtn = document.getElementById("clearBtn");
-const dockList = document.getElementById("dockList");
-
-let isInspecting = false;
-
-// Initialize
 document.addEventListener("DOMContentLoaded", () => {
-    renderDock();
-    checkInspectorStatus();
-});
+    const toggleBtn = document.getElementById("toggle-inspector");
+    const copyBtn = document.getElementById("copy-full-page");
+    const previewBtn = document.getElementById("preview-design");
+    const clearBtn = document.getElementById("clear-dock");
+    const status = document.getElementById("status-message");
+    const dockList = document.getElementById("dock-list");
+    const dockCount = document.getElementById("dock-count");
 
-// Check if inspector is currently active
-async function checkInspectorStatus() {
-    try {
-        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        if (tab && tab.id) {
-            chrome.tabs.sendMessage(tab.id, { action: "getStatus" }, (response) => {
-                if (response && response.isActive) {
-                    isInspecting = true;
-                    updateToggleButton();
-                }
-            });
-        }
-    } catch (err) {
-        console.log("Could not check inspector status:", err);
-    }
-}
+    const setStatus = (msg) => { status.textContent = msg; };
 
-// Toggle Inspector
-toggleBtn.addEventListener("click", async () => {
-    isInspecting = !isInspecting;
-    updateToggleButton();
-
-    try {
-        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        if (tab && tab.id) {
-            chrome.tabs.sendMessage(tab.id, {
-                action: "toggleInspection",
-                isActive: isInspecting
-            });
-        }
-    } catch (err) {
-        console.error("Error toggling inspector:", err);
-        showToast("Error: Could not activate inspector", "error");
-    }
-});
-
-function updateToggleButton() {
-    if (isInspecting) {
-        toggleBtn.classList.add("active");
-        toggleBtn.innerHTML = '<span>✅</span> Inspector Active';
-    } else {
-        toggleBtn.classList.remove("active");
-        toggleBtn.innerHTML = '<span>🎯</span> Start Inspector';
-    }
-}
-
-// Clear All Items
-clearBtn.addEventListener("click", () => {
-    if (confirm("Clear all captured components?")) {
-        chrome.storage.local.set({ dockItems: [] }, () => {
-            renderDock();
-            showToast("All items cleared!");
-        });
-    }
-});
-
-// Render Dock Items
-function renderDock() {
-    chrome.storage.local.get({ dockItems: [] }, (result) => {
-        const items = result.dockItems;
-
-        if (items.length === 0) {
-            dockList.innerHTML = `
-        <div class="empty-state">
-          <div class="icon">📦</div>
-          <h3>No components yet</h3>
-          <p>Click "Start Inspector" then click on any element on a webpage to capture it with Tailwind CSS classes.</p>
-        </div>
-      `;
+    // Check state on load
+    chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
+        if (!tab || tab.url.startsWith("chrome://")) {
+            setStatus("Cannot run on system pages");
+            toggleBtn.disabled = true;
+            copyBtn.disabled = true;
+            previewBtn.disabled = true;
             return;
         }
 
-        dockList.innerHTML = items.map((item, index) => `
-      <div class="dock-item" data-id="${item.id}">
-        <div class="dock-item-header">
-          <div class="dock-item-meta">
-            <span class="dock-item-source">${item.source}</span>
-            <span class="dock-item-time">${item.timestamp}</span>
-          </div>
-          <div class="dock-item-actions">
-            <button class="btn-copy" data-index="${index}" title="Copy HTML">📋 Copy</button>
-            <button class="btn-preview" data-index="${index}" title="Open Preview">👁️</button>
-            <button class="btn-delete" data-index="${index}" title="Delete">✕</button>
-          </div>
-        </div>
-        <div class="preview-container">
-          <div class="preview-root" data-index="${index}"></div>
-          <div class="preview-overlay"></div>
-        </div>
-      </div>
-    `).join("");
-
-        // Render previews with Shadow DOM + Tailwind CDN
-        items.forEach((item, index) => {
-            const previewRoot = dockList.querySelector(`.preview-root[data-index="${index}"]`);
-            if (previewRoot) {
-                const shadow = previewRoot.attachShadow({ mode: "open" });
-
-                // Inject Tailwind CDN so the classes actually work in the preview
-                shadow.innerHTML = `
-          <script src="https://cdn.tailwindcss.com"><\/script>
-          <style>
-            :host {
-              all: initial;
-              display: block;
+        chrome.runtime.sendMessage(
+            { action: "getInspectionState", tabId: tab.id },
+            (res) => {
+                if (res?.isActive) {
+                    toggleBtn.textContent = "Deactivate Inspector";
+                    toggleBtn.classList.add("active");
+                }
             }
-            * {
-              max-width: 100% !important;
+        );
+    });
+
+    function ensureContent(tabId, cb) {
+        chrome.tabs.sendMessage(tabId, { action: "ping" }, () => {
+            if (chrome.runtime.lastError) {
+                chrome.scripting.insertCSS({ target: { tabId }, files: ["styles.css"] }, () => {
+                    chrome.scripting.executeScript({ target: { tabId }, files: ["content.js"] }, () => {
+                        cb();
+                    });
+                });
+            } else {
+                cb();
             }
-          </style>
-          <div style="transform: scale(0.5); transform-origin: top left; display: inline-block;">
-            ${item.html} 
+        });
+    }
+
+    toggleBtn.onclick = () => {
+        chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
+            ensureContent(tab.id, () => {
+                chrome.runtime.sendMessage(
+                    { action: "toggleInspection", tabId: tab.id },
+                    (res) => {
+                        if (res.isActive) {
+                            toggleBtn.textContent = "Deactivate Inspector";
+                            toggleBtn.classList.add("active");
+                            setStatus("Click any element to steal it");
+                            window.close();
+                        } else {
+                            toggleBtn.textContent = "Activate Inspector";
+                            toggleBtn.classList.remove("active");
+                            setStatus("Inspector deactivated");
+                        }
+                    }
+                );
+            });
+        });
+    };
+
+    copyBtn.onclick = () => {
+        chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
+            setStatus("Copying...");
+            chrome.tabs.sendMessage(tab.id, { action: "copyFullPage" }, (res) => {
+                if (res?.success) setStatus("Full page copied!");
+                else setStatus("Copy failed");
+            });
+        });
+    };
+
+    previewBtn.onclick = () => {
+        chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
+            ensureContent(tab.id, () => {
+                setStatus("Capturing...");
+
+                chrome.tabs.sendMessage(tab.id, { action: "getRawCode" }, (res) => {
+                    if (res && res.success) {
+                        chrome.storage.local.set({
+                            'stolenHTML': res.html,
+                            'pageUrl': res.url
+                        }, () => {
+                            chrome.tabs.create({ url: 'preview.html' });
+                            window.close();
+                        });
+                    } else {
+                        setStatus("Failed to capture");
+                    }
+                });
+            });
+        });
+    };
+
+    clearBtn.onclick = () => {
+        chrome.storage.local.set({ dockItems: [] }, () => {
+            renderDock();
+            setStatus("Cleared!");
+        });
+    };
+
+    // --- HTML PROCESSORS ---
+    function processHtmlForCopy(html, mode) {
+        const div = document.createElement('div');
+        div.innerHTML = html;
+        const root = div.firstElementChild; // Proceed with the single root element we usually capture
+
+        if (!root) return html;
+
+        const all = [root, ...root.querySelectorAll('*')];
+        all.forEach(el => {
+            if (mode === 'tailwind') {
+                const tw = el.getAttribute('data-tw');
+                if (tw) {
+                    el.className = tw; // Replace classes with Tailwind
+                    el.removeAttribute('data-tw');
+                    el.removeAttribute('style'); // Remove inline styles as we are using pure TW
+                } else {
+                    // If no TW data, maybe keep original class? 
+                    // Or keep it plain. Let's keep original class if TW not present.
+                }
+            } else {
+                // Clean mode: just remove data-tw
+                el.removeAttribute('data-tw');
+                // Keep inline styles and original classes
+            }
+
+            // Cleanup internal markers
+            el.removeAttribute('data-is-canvas');
+            el.removeAttribute('data-width');
+            el.removeAttribute('data-height');
+        });
+
+        // Special cleanup for generated TW
+        return root.outerHTML;
+    }
+
+    function renderDock() {
+        chrome.storage.local.get({ dockItems: [] }, (result) => {
+            const items = result.dockItems;
+            dockCount.textContent = items.length;
+
+            if (items.length === 0) {
+                dockList.innerHTML = `
+          <div class="empty-state">
+            <div class="icon">.</div>
+            <h3>No components yet</h3>
+            <p>Activate the inspector and click on any element to capture it.</p>
           </div>
         `;
+                return;
             }
+
+            dockList.innerHTML = items.map((item, index) => `
+        <div class="dock-item" data-index="${index}">
+          <div class="dock-item-header">
+            <div class="dock-item-meta">
+              <span class="dock-item-source">${item.source}</span>
+              <span class="dock-item-time">${item.timestamp}</span>
+            </div>
+            <div class="dock-item-actions">
+              <button class="btn-copy-raw" data-index="${index}" title="Copy HTML with original classes">HTML</button>
+              <button class="btn-copy-tw" data-index="${index}" title="Copy with Tailwind CSS">TW</button>
+              <button class="btn-view" data-index="${index}">View</button>
+              <button class="btn-delete" data-index="${index}">×</button>
+            </div>
+          </div>
+          <div class="preview-box" data-index="${index}">
+            <div class="preview-overlay"></div>
+          </div>
+        </div>
+      `).join("");
+
+            // Render previews in iframes
+            items.forEach((item, index) => {
+                const previewBox = dockList.querySelector(`.preview-box[data-index="${index}"]`);
+                if (previewBox) {
+                    const iframe = document.createElement('iframe');
+                    iframe.sandbox = 'allow-same-origin';
+                    iframe.style.cssText = 'width:250%;height:200px;border:none;transform:scale(0.4);transform-origin:top left;pointer-events:none;';
+                    previewBox.insertBefore(iframe, previewBox.firstChild);
+
+                    setTimeout(() => {
+                        try {
+                            const doc = iframe.contentDocument || iframe.contentWindow.document;
+                            doc.open();
+                            if (item.url) {
+                                doc.write(`<base href="${item.url}">`);
+                            }
+                            // Inject stylesheets for preview fidelity
+                            if (item.stylesheets) {
+                                item.stylesheets.forEach(href => {
+                                    doc.write(`<link rel="stylesheet" href="${href}">`);
+                                });
+                            }
+                            doc.write(`<body style="margin:0;padding:8px;background:#0a0a0b;">${item.html}</body>`);
+                            doc.close();
+                        } catch (e) {
+                            console.log('Preview error:', e);
+                        }
+                    }, 50);
+                }
+            });
+
+            attachItemListeners(items);
+        });
+    }
+
+    function attachItemListeners(items) {
+        // Copy RAW HTML
+        document.querySelectorAll(".btn-copy-raw").forEach(btn => {
+            btn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const index = parseInt(e.target.dataset.index);
+                const rawHtml = processHtmlForCopy(items[index].html, 'raw');
+
+                navigator.clipboard.writeText(rawHtml).then(() => {
+                    setStatus("Copied HTML!");
+                    const originalText = e.target.textContent;
+                    e.target.textContent = "OK";
+                    setTimeout(() => { e.target.textContent = originalText; }, 1000);
+                });
+            });
         });
 
-        // Attach event listeners
-        attachItemListeners(items);
-    });
-}
+        // Copy TAILWIND
+        document.querySelectorAll(".btn-copy-tw").forEach(btn => {
+            btn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const index = parseInt(e.target.dataset.index);
 
-function attachItemListeners(items) {
-    // Copy buttons
-    document.querySelectorAll(".btn-copy").forEach(btn => {
-        btn.addEventListener("click", (e) => {
-            const index = parseInt(e.target.dataset.index);
-            const html = items[index].html;
+                // Show analyzing state as this might take a ms
+                setStatus("Generating Tailwind...");
 
-            navigator.clipboard.writeText(html).then(() => {
-                showToast("Copied to clipboard!");
-                e.target.textContent = "✓ Copied";
+                // Use setTimeout to allow UI update
                 setTimeout(() => {
-                    e.target.textContent = "📋 Copy";
-                }, 1500);
-            }).catch(err => {
-                console.error("Copy failed:", err);
-                showToast("Failed to copy", "error");
+                    const twHtml = processHtmlForCopy(items[index].html, 'tailwind');
+                    navigator.clipboard.writeText(twHtml).then(() => {
+                        setStatus("Copied Tailwind!");
+                        const originalText = e.target.textContent;
+                        e.target.textContent = "OK";
+                        setTimeout(() => { e.target.textContent = originalText; }, 1000);
+                    });
+                }, 10);
             });
         });
-    });
 
-    // Preview buttons
-    document.querySelectorAll(".btn-preview").forEach(btn => {
-        btn.addEventListener("click", (e) => {
-            const index = parseInt(e.target.dataset.index);
-            const item = items[index];
+        document.querySelectorAll(".btn-view").forEach(btn => {
+            btn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const index = parseInt(e.target.dataset.index);
+                const item = items[index];
 
-            // Store the item for the preview page
-            chrome.storage.local.set({ previewItem: item }, () => {
-                chrome.tabs.create({ url: "preview.html" });
+                chrome.storage.local.set({
+                    previewItem: item,
+                    stolenHTML: item.html,
+                    pageUrl: item.url
+                }, () => {
+                    chrome.tabs.create({ url: "preview.html" });
+                });
             });
         });
-    });
 
-    // Delete buttons
-    document.querySelectorAll(".btn-delete").forEach(btn => {
-        btn.addEventListener("click", (e) => {
-            const index = parseInt(e.target.dataset.index);
-            items.splice(index, 1);
+        document.querySelectorAll(".btn-delete").forEach(btn => {
+            btn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const index = parseInt(e.target.dataset.index);
+                items.splice(index, 1);
 
-            chrome.storage.local.set({ dockItems: items }, () => {
-                renderDock();
-                showToast("Item deleted");
+                chrome.storage.local.set({ dockItems: items }, () => {
+                    renderDock();
+                });
             });
         });
-    });
-}
-
-// Toast notification
-function showToast(message, type = "success") {
-    // Remove existing toast
-    const existingToast = document.querySelector(".toast");
-    if (existingToast) existingToast.remove();
-
-    const toast = document.createElement("div");
-    toast.className = "toast";
-    toast.textContent = message;
-
-    if (type === "error") {
-        toast.style.background = "#ef4444";
     }
 
-    document.body.appendChild(toast);
+    renderDock();
 
-    setTimeout(() => {
-        toast.style.opacity = "0";
-        toast.style.transform = "translateX(-50%) translateY(10px)";
-        setTimeout(() => toast.remove(), 300);
-    }, 2000);
-}
-
-// Listen for storage changes to update dock in real-time
-chrome.storage.onChanged.addListener((changes, namespace) => {
-    if (namespace === "local" && changes.dockItems) {
-        renderDock();
-    }
+    chrome.storage.onChanged.addListener((changes, namespace) => {
+        if (namespace === "local" && changes.dockItems) {
+            renderDock();
+        }
+    });
 });

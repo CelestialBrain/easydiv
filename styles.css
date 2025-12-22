@@ -1,0 +1,5 @@
+/* Highlighter styles injected via content script */
+#easydiv-highlighter {
+  pointer-events: none !important;
+  z-index: 2147483647 !important;
+}

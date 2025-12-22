@@ -5,7 +5,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EasyDiv Preview</title>
-    <script src="https://cdn.tailwindcss.com"></script>
     <style>
         * {
             margin: 0;
@@ -14,7 +13,7 @@
         }
 
         body {
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-family: system-ui, -apple-system, sans-serif;
             background: #09090b;
             color: #fafafa;
             min-height: 100vh;
@@ -25,10 +24,11 @@
             top: 0;
             left: 0;
             right: 0;
-            background: rgba(9, 9, 11, 0.95);
+            height: 50px;
+            background: rgba(9, 9, 11, 0.98);
             backdrop-filter: blur(10px);
             border-bottom: 1px solid #27272a;
-            padding: 12px 24px;
+            padding: 0 24px;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -42,54 +42,47 @@
         }
 
         .toolbar h1 {
-            font-size: 16px;
+            font-size: 15px;
             font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 8px;
         }
 
-        .toolbar h1 span {
+        .toolbar h1 .logo {
             background: linear-gradient(135deg, #8b5cf6, #a78bfa);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
 
         .source-badge {
-            font-size: 12px;
+            font-size: 11px;
             color: #8b5cf6;
             background: rgba(139, 92, 246, 0.1);
-            padding: 4px 12px;
+            padding: 4px 10px;
             border-radius: 4px;
             border: 1px solid rgba(139, 92, 246, 0.2);
         }
 
         .toolbar-right {
             display: flex;
-            gap: 10px;
+            gap: 8px;
         }
 
         .btn {
-            padding: 8px 16px;
+            padding: 6px 14px;
             border: none;
-            border-radius: 6px;
-            font-size: 13px;
+            border-radius: 5px;
+            font-size: 12px;
             font-weight: 500;
             cursor: pointer;
             transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            gap: 6px;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
         }
 
         .btn-primary {
             background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
             color: white;
-        }
-
-        .btn-primary:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px -2px rgba(139, 92, 246, 0.4);
         }
 
         .btn-secondary {
@@ -103,150 +96,40 @@
             color: #fafafa;
         }
 
-        .view-toggle {
-            display: flex;
-            background: #18181b;
-            border-radius: 6px;
-            overflow: hidden;
-            border: 1px solid #27272a;
+        #canvas {
+            position: fixed;
+            top: 50px;
+            left: 0;
+            width: 100%;
+            height: calc(100vh - 50px);
+            border: none;
+            background: white;
         }
 
-        .view-toggle button {
-            padding: 8px 16px;
+        .mode-switch {
+            display: flex;
+            background: #27272a;
+            border-radius: 6px;
+            padding: 2px;
+            margin-right: 16px;
+        }
+
+        .mode-btn {
             background: transparent;
             border: none;
             color: #71717a;
-            font-size: 13px;
+            padding: 4px 12px;
+            font-size: 11px;
             font-weight: 500;
+            border-radius: 4px;
             cursor: pointer;
-            transition: all 0.2s ease;
+            transition: all 0.2s;
         }
 
-        .view-toggle button.active {
-            background: #8b5cf6;
+        .mode-btn.active {
+            background: #3f3f46;
             color: white;
-        }
-
-        .view-toggle button:hover:not(.active) {
-            color: #fafafa;
-        }
-
-        .content {
-            padding-top: 80px;
-            min-height: 100vh;
-        }
-
-        /* Preview Mode */
-        .preview-mode {
-            padding: 40px;
-            display: flex;
-            justify-content: center;
-            align-items: flex-start;
-        }
-
-        .preview-frame {
-            background: #18181b;
-            border: 1px solid #27272a;
-            border-radius: 12px;
-            padding: 40px;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-            max-width: 100%;
-            overflow: auto;
-        }
-
-        /* Code Mode */
-        .code-mode {
-            padding: 24px;
-            display: none;
-        }
-
-        .code-mode.active {
-            display: block;
-        }
-
-        .preview-mode.active {
-            display: flex;
-        }
-
-        .preview-mode:not(.active) {
-            display: none;
-        }
-
-        .code-container {
-            background: #18181b;
-            border: 1px solid #27272a;
-            border-radius: 12px;
-            overflow: hidden;
-        }
-
-        .code-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 12px 16px;
-            background: #09090b;
-            border-bottom: 1px solid #27272a;
-        }
-
-        .code-header span {
-            font-size: 12px;
-            color: #71717a;
-        }
-
-        .code-content {
-            padding: 20px;
-            overflow-x: auto;
-        }
-
-        .code-content pre {
-            margin: 0;
-            font-family: 'JetBrains Mono', 'Fira Code', monospace;
-            font-size: 13px;
-            line-height: 1.6;
-            color: #a1a1aa;
-            white-space: pre-wrap;
-            word-break: break-word;
-        }
-
-        .code-content code {
-            color: #8b5cf6;
-        }
-
-        /* Syntax highlighting */
-        .tag {
-            color: #f472b6;
-        }
-
-        .attr {
-            color: #fbbf24;
-        }
-
-        .string {
-            color: #34d399;
-        }
-
-        .comment {
-            color: #52525b;
-        }
-
-        .empty-state {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 60vh;
-            color: #52525b;
-            text-align: center;
-        }
-
-        .empty-state h2 {
-            font-size: 18px;
-            color: #71717a;
-            margin-bottom: 8px;
-        }
-
-        .empty-state p {
-            font-size: 14px;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
         }
     </style>
 </head>
@@ -254,38 +137,20 @@
 <body>
     <div class="toolbar">
         <div class="toolbar-left">
-            <h1>⚡ <span>EasyDiv</span> Preview</h1>
-            <span class="source-badge" id="sourceBadge">Loading...</span>
+            <h1><span class="logo">EasyDiv</span> Preview</h1>
+            <span class="source-badge" id="source-badge">Loading...</span>
         </div>
         <div class="toolbar-right">
-            <div class="view-toggle">
-                <button id="viewPreview" class="active">Preview</button>
-                <button id="viewCode">Code</button>
+            <div class="mode-switch">
+                <button class="mode-btn active" id="mode-original">Original</button>
+                <button class="mode-btn" id="mode-tailwind">Tailwind</button>
             </div>
-            <button class="btn btn-primary" id="copyBtn">📋 Copy Code</button>
-            <button class="btn btn-secondary" id="backBtn">← Back</button>
+            <button class="btn btn-primary" id="copy-btn">Copy HTML</button>
+            <button class="btn btn-secondary" id="back-btn">Back</button>
         </div>
     </div>
 
-    <div class="content">
-        <div class="preview-mode active" id="previewContainer">
-            <div class="preview-frame" id="previewFrame">
-                <!-- Component will be rendered here -->
-            </div>
-        </div>
-
-        <div class="code-mode" id="codeContainer">
-            <div class="code-container">
-                <div class="code-header">
-                    <span>HTML + Tailwind CSS</span>
-                    <button class="btn btn-secondary" id="copyCodeBtn">📋 Copy</button>
-                </div>
-                <div class="code-content">
-                    <pre id="codeDisplay"><code></code></pre>
-                </div>
-            </div>
-        </div>
-    </div>
+    <iframe id="canvas"></iframe>
 
     <script src="preview.js"></script>
 </body>

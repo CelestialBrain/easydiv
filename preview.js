@@ -1,141 +1,184 @@
-// DOM Elements
-const previewFrame = document.getElementById("previewFrame");
-const codeDisplay = document.getElementById("codeDisplay").querySelector("code");
-const sourceBadge = document.getElementById("sourceBadge");
-const previewContainer = document.getElementById("previewContainer");
-const codeContainer = document.getElementById("codeContainer");
-const viewPreviewBtn = document.getElementById("viewPreview");
-const viewCodeBtn = document.getElementById("viewCode");
-const copyBtn = document.getElementById("copyBtn");
-const copyCodeBtn = document.getElementById("copyCodeBtn");
-const backBtn = document.getElementById("backBtn");
+const iframe = document.getElementById('canvas');
+const sourceBadge = document.getElementById('source-badge');
+const copyBtn = document.getElementById('copy-btn');
+const backBtn = document.getElementById('back-btn');
+const modeOriginalBtn = document.getElementById('mode-original');
+const modeTailwindBtn = document.getElementById('mode-tailwind');
 
-let currentHTML = "";
+let stolenHTML = '';
+let pageUrl = '';
+let stylesheets = [];
+let currentMode = 'original'; // 'original' | 'tailwind'
 
-// Initialize
-document.addEventListener("DOMContentLoaded", () => {
-    loadPreviewItem();
-    setupEventListeners();
+chrome.storage.local.get(['stolenHTML', 'pageUrl', 'previewItem'], (result) => {
+    let html = result.stolenHTML || result.previewItem?.html || "<h1 style='font-family:sans-serif; padding:20px; color:#333;'>No content found. Try capturing again.</h1>";
+    pageUrl = result.pageUrl || result.previewItem?.url || '';
+    stylesheets = result.previewItem?.stylesheets || [];
+    stolenHTML = html;
+
+    // Update source badge
+    if (pageUrl) {
+        try {
+            sourceBadge.textContent = new URL(pageUrl).hostname;
+        } catch {
+            sourceBadge.textContent = 'Unknown';
+        }
+    }
+
+    renderPreview('original');
 });
 
-function loadPreviewItem() {
-    chrome.storage.local.get({ previewItem: null }, (result) => {
-        const item = result.previewItem;
+function processHtml(html, mode) {
+    const div = document.createElement('div');
+    div.innerHTML = html;
 
-        if (!item) {
-            showEmptyState();
-            return;
-        }
+    // Process full page differently? 
+    // If it's a full page capture, our "freezeElement" logic wasn't applied recursively for data-tw generally
+    // (Wait, 'copyFullPage' just grabs documentElement.outerHTML).
+    // So 'tailwind' mode only really works for 'Captured Components' via inspector, not full page copies.
+    // Full page copies don't have data-tw attributes set.
 
-        currentHTML = item.html;
-        sourceBadge.textContent = item.source;
+    // For components:
+    const root = div.firstElementChild;
+    if (!root) return html;
 
-        // Sanitize HTML - remove auth-bridge and login links
-        let sanitizedHTML = sanitizeHTML(currentHTML);
-
-        // Render preview
-        previewFrame.innerHTML = sanitizedHTML;
-
-        // Render code with syntax highlighting
-        codeDisplay.innerHTML = formatHTMLForDisplay(sanitizedHTML);
-    });
-}
-
-function sanitizeHTML(html) {
-    // Create a temporary container
-    const temp = document.createElement("div");
-    temp.innerHTML = html;
-
-    // Remove problematic links (auth-bridge, login redirects, relative paths)
-    const links = temp.querySelectorAll('link[rel="stylesheet"]');
-    links.forEach(link => {
-        const href = link.getAttribute("href") || "";
-        if (
-            href.includes("auth-bridge") ||
-            href.includes("login") ||
-            href.startsWith("/") ||
-            !href.startsWith("http")
-        ) {
-            link.remove();
-        }
-    });
-
-    // Remove script tags
-    temp.querySelectorAll("script").forEach(s => s.remove());
-
-    // Remove inline event handlers
-    const allElements = temp.querySelectorAll("*");
-    allElements.forEach(el => {
-        Array.from(el.attributes).forEach(attr => {
-            if (attr.name.startsWith("on")) {
-                el.removeAttribute(attr.name);
+    const all = [root, ...root.querySelectorAll('*')];
+    all.forEach(el => {
+        if (mode === 'tailwind') {
+            const tw = el.getAttribute('data-tw');
+            if (tw) {
+                el.className = tw;
+                el.removeAttribute('data-tw');
+                el.removeAttribute('style');
             }
-        });
+        } else {
+            // Original mode: just ignore data-tw, keep original classes
+            // We strip data-tw just to keep DOM clean in preview
+            el.removeAttribute('data-tw');
+        }
+
+        // Cleanup internal markers
+        el.removeAttribute('data-is-canvas');
+        el.removeAttribute('data-width');
+        el.removeAttribute('data-height');
     });
 
-    return temp.innerHTML;
+    // Sanitization (Common for both)
+    let processed = root.outerHTML;
+
+    // Remove scripts
+    processed = processed.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+    processed = processed.replace(/<script[^>]*\/>/gi, '');
+    processed = processed.replace(/<noscript\b[^<]*(?:(?!<\/noscript>)<[^<]*)*<\/noscript>/gi, '');
+    processed = processed.replace(/<link[^>]+href=["'][^"']*(?:auth-bridge|login)[^"']*["'][^>]*>/gi, '');
+    processed = processed.replace(/\s+on\w+\s*=\s*["'][^"']*["']/gi, '');
+
+    return processed;
 }
 
-function formatHTMLForDisplay(html) {
-    // Basic syntax highlighting
-    return html
-        // Escape HTML entities first
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        // Then apply highlighting
-        .replace(/(&lt;\/?)([\w-]+)/g, '$1<span class="tag">$2</span>')
-        .replace(/([\w-]+)=("[^"]*")/g, '<span class="attr">$1</span>=<span class="string">$2</span>')
-        .replace(/(&lt;!--.*?--&gt;)/g, '<span class="comment">$1</span>');
+function renderPreview(mode) {
+    currentMode = mode;
+
+    // UI Updates
+    if (mode === 'original') {
+        modeOriginalBtn.classList.add('active');
+        modeTailwindBtn.classList.remove('active');
+    } else {
+        modeOriginalBtn.classList.remove('active');
+        modeTailwindBtn.classList.add('active');
+    }
+
+    const isFullPage = stolenHTML.includes('<html') || stolenHTML.includes('<!DOCTYPE');
+    let content = processHtml(stolenHTML, mode);
+
+    let finalDoc = '';
+
+    if (isFullPage) {
+        // Full Page Logic
+        finalDoc = content;
+        if (pageUrl) {
+            const baseTag = `<base href="${pageUrl}">`;
+            if (finalDoc.includes('<head>')) {
+                finalDoc = finalDoc.replace('<head>', `<head>\n${baseTag}\n`);
+            }
+        }
+        // Inject Tailwind if needed? Full page usually doesn't have data-tw, so this might be moot.
+        // But if we ever support full page analysis, we'd add <script src="cdn..."></script> here.
+    } else {
+        // Component Logic
+        let headContent = `
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            ${pageUrl ? `<base href="${pageUrl}">` : ''}
+        `;
+
+        if (mode === 'original') {
+            // Inject original stylesheets
+            if (stylesheets.length > 0) {
+                headContent += stylesheets
+                    .filter(href => !href.includes('chrome-extension://'))
+                    .map(href => `<link rel="stylesheet" href="${href}" onerror="this.remove()">`)
+                    .join('\n');
+            }
+            headContent += `
+                <style>
+                    body { margin: 0; padding: 20px; font-family: system-ui, -apple-system, sans-serif; background: #fff; }
+                    /* Fallback to ensure text visibility if styles fail */
+                    @media (prefers-color-scheme: dark) {
+                        body { background: #1a1a1a; color: #eee; }
+                    }
+                </style>
+            `;
+        } else {
+            // Tailwind Mode
+            headContent += `
+                <script src="https://cdn.tailwindcss.com"></script>
+                <style>
+                    body { margin: 0; padding: 20px; background: #0f172a; } /* Slate-900 bg for contrast */
+                </style>
+                <script>
+                    tailwind.config = {
+                        theme: { extend: {} },
+                        corePlugins: { preflight: false } // Disable preflight to avoid resetting everything hard? No, let's keep it standard.
+                        // Actually, 'preflight: false' helps if the captured component relies on browser defaults, 
+                        // but usually Tailwind components rely on preflight being present.
+                    }
+                </script>
+            `;
+        }
+
+        finalDoc = `<!DOCTYPE html>
+        <html>
+        <head>
+            ${headContent}
+        </head>
+        <body>
+            ${content}
+        </body>
+        </html>`;
+    }
+
+    iframe.srcdoc = finalDoc;
 }
 
-function showEmptyState() {
-    previewFrame.innerHTML = `
-    <div class="empty-state">
-      <h2>No component to preview</h2>
-      <p>Capture a component from a webpage first</p>
-    </div>
-  `;
-}
+// Event Listeners
+modeOriginalBtn.addEventListener('click', () => renderPreview('original'));
+modeTailwindBtn.addEventListener('click', () => renderPreview('tailwind'));
 
-function setupEventListeners() {
-    // View toggle
-    viewPreviewBtn.addEventListener("click", () => {
-        viewPreviewBtn.classList.add("active");
-        viewCodeBtn.classList.remove("active");
-        previewContainer.classList.add("active");
-        codeContainer.classList.remove("active");
-    });
+copyBtn.addEventListener('click', () => {
+    // Copy the PROCESSED html based on current mode
+    const finalHtml = processHtml(stolenHTML, currentMode);
 
-    viewCodeBtn.addEventListener("click", () => {
-        viewCodeBtn.classList.add("active");
-        viewPreviewBtn.classList.remove("active");
-        codeContainer.classList.add("active");
-        previewContainer.classList.remove("active");
-    });
-
-    // Copy buttons
-    copyBtn.addEventListener("click", copyToClipboard);
-    copyCodeBtn.addEventListener("click", copyToClipboard);
-
-    // Back button
-    backBtn.addEventListener("click", () => {
-        window.close();
-    });
-}
-
-function copyToClipboard() {
-    navigator.clipboard.writeText(currentHTML).then(() => {
-        const btn = event.target;
-        const originalText = btn.textContent;
-        btn.textContent = "✓ Copied!";
-        btn.style.background = "#22c55e";
+    navigator.clipboard.writeText(finalHtml).then(() => {
+        copyBtn.textContent = 'Copied!';
+        copyBtn.style.background = '#22c55e';
         setTimeout(() => {
-            btn.textContent = originalText;
-            btn.style.background = "";
+            copyBtn.textContent = 'Copy HTML';
+            copyBtn.style.background = '';
         }, 1500);
-    }).catch(err => {
-        console.error("Copy failed:", err);
-        alert("Failed to copy to clipboard");
     });
-}
+});
+
+backBtn.addEventListener('click', () => {
+    window.close();
+});

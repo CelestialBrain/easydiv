@@ -1,308 +1,321 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>EasyDiv</title>
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EasyDiv</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-    body {
-      width: 400px;
-      min-height: 500px;
-      max-height: 600px;
-      background: linear-gradient(180deg, #09090b 0%, #18181b 100%);
-      color: #fafafa;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      overflow: hidden;
-    }
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            width: 280px;
+            background: #18181b;
+            color: white;
+        }
 
-    .header {
-      padding: 16px 20px;
-      border-bottom: 1px solid #27272a;
-      background: linear-gradient(180deg, rgba(139, 92, 246, 0.1) 0%, transparent 100%);
-    }
+        .header {
+            padding: 16px;
+            border-bottom: 1px solid #27272a;
+            background: linear-gradient(180deg, rgba(139, 92, 246, 0.1) 0%, transparent 100%);
+        }
 
-    .header h1 {
-      font-size: 18px;
-      font-weight: 700;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
+        .header h1 {
+            font-size: 16px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
 
-    .header h1 span {
-      background: linear-gradient(135deg, #8b5cf6, #a78bfa);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
+        .header h1 .logo {
+            background: linear-gradient(135deg, #8b5cf6, #a78bfa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
 
-    .header p {
-      font-size: 12px;
-      color: #71717a;
-      margin-top: 4px;
-    }
+        .header p {
+            font-size: 11px;
+            color: #71717a;
+            margin-top: 4px;
+        }
 
-    .controls {
-      padding: 16px 20px;
-      display: flex;
-      gap: 10px;
-      border-bottom: 1px solid #27272a;
-    }
+        .controls {
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            border-bottom: 1px solid #27272a;
+        }
 
-    .btn {
-      flex: 1;
-      padding: 10px 16px;
-      border: none;
-      border-radius: 8px;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-    }
+        button {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            color: white;
+            cursor: pointer;
+            border-radius: 6px;
+            font-weight: 500;
+            font-size: 13px;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
 
-    .btn-primary {
-      background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
-      color: white;
-      box-shadow: 0 4px 14px -3px rgba(139, 92, 246, 0.4);
-    }
+        button:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
 
-    .btn-primary:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 6px 20px -3px rgba(139, 92, 246, 0.5);
-    }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
 
-    .btn-primary.active {
-      background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
-      box-shadow: 0 4px 14px -3px rgba(34, 197, 94, 0.4);
-    }
+        #toggle-inspector {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            box-shadow: 0 4px 12px -3px rgba(59, 130, 246, 0.4);
+        }
 
-    .btn-secondary {
-      background: #27272a;
-      color: #a1a1aa;
-      border: 1px solid #3f3f46;
-    }
+        #toggle-inspector.active {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            box-shadow: 0 4px 12px -3px rgba(239, 68, 68, 0.4);
+        }
 
-    .btn-secondary:hover {
-      background: #3f3f46;
-      color: #fafafa;
-    }
+        #copy-full-page {
+            background: #10b981;
+        }
 
-    .dock-container {
-      height: 380px;
-      overflow-y: auto;
-      padding: 12px;
-    }
+        #preview-design {
+            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+            box-shadow: 0 4px 12px -3px rgba(139, 92, 246, 0.4);
+        }
 
-    .dock-container::-webkit-scrollbar {
-      width: 6px;
-    }
+        .row {
+            display: flex;
+            gap: 8px;
+        }
 
-    .dock-container::-webkit-scrollbar-track {
-      background: transparent;
-    }
+        .row button {
+            flex: 1;
+        }
 
-    .dock-container::-webkit-scrollbar-thumb {
-      background: #3f3f46;
-      border-radius: 3px;
-    }
+        #clear-dock {
+            background: #27272a;
+            border: 1px solid #3f3f46;
+        }
 
-    .empty-state {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100%;
-      color: #52525b;
-      text-align: center;
-      padding: 40px;
-    }
+        #status-message {
+            font-size: 11px;
+            margin-top: 8px;
+            text-align: center;
+            color: #a1a1aa;
+            min-height: 16px;
+        }
 
-    .empty-state .icon {
-      font-size: 48px;
-      margin-bottom: 16px;
-      opacity: 0.5;
-    }
+        .dock-header {
+            padding: 10px 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #27272a;
+        }
 
-    .empty-state h3 {
-      font-size: 14px;
-      font-weight: 600;
-      color: #71717a;
-      margin-bottom: 8px;
-    }
+        .dock-header span {
+            font-size: 12px;
+            color: #71717a;
+        }
 
-    .empty-state p {
-      font-size: 12px;
-      line-height: 1.5;
-    }
+        .dock-header .count {
+            background: #27272a;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 11px;
+            color: #8b5cf6;
+        }
 
-    .dock-item {
-      background: #18181b;
-      border: 1px solid #27272a;
-      border-radius: 10px;
-      margin-bottom: 10px;
-      overflow: hidden;
-      transition: all 0.2s ease;
-    }
+        .dock-container {
+            max-height: 300px;
+            overflow-y: auto;
+        }
 
-    .dock-item:hover {
-      border-color: #3f3f46;
-      box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.3);
-    }
+        .dock-container::-webkit-scrollbar {
+            width: 4px;
+        }
 
-    .dock-item-header {
-      padding: 10px 12px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: #09090b;
-      border-bottom: 1px solid #27272a;
-    }
+        .dock-container::-webkit-scrollbar-thumb {
+            background: #3f3f46;
+            border-radius: 2px;
+        }
 
-    .dock-item-meta {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
+        .empty-state {
+            padding: 30px 20px;
+            text-align: center;
+            color: #52525b;
+        }
 
-    .dock-item-source {
-      font-size: 11px;
-      color: #8b5cf6;
-      font-weight: 500;
-      background: rgba(139, 92, 246, 0.1);
-      padding: 2px 8px;
-      border-radius: 4px;
-    }
+        .empty-state .icon {
+            font-size: 32px;
+            margin-bottom: 8px;
+        }
 
-    .dock-item-time {
-      font-size: 10px;
-      color: #52525b;
-    }
+        .empty-state h3 {
+            font-size: 13px;
+            color: #71717a;
+            margin-bottom: 4px;
+        }
 
-    .dock-item-actions {
-      display: flex;
-      gap: 4px;
-    }
+        .empty-state p {
+            font-size: 11px;
+            line-height: 1.4;
+        }
 
-    .dock-item-actions button {
-      padding: 6px 10px;
-      font-size: 11px;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      transition: all 0.15s ease;
-      font-weight: 500;
-    }
+        .dock-item {
+            border-bottom: 1px solid #27272a;
+            padding: 10px 12px;
+        }
 
-    .btn-copy {
-      background: #27272a;
-      color: #a1a1aa;
-    }
+        .dock-item:hover {
+            background: rgba(139, 92, 246, 0.05);
+        }
 
-    .btn-copy:hover {
-      background: #8b5cf6;
-      color: white;
-    }
+        .dock-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
 
-    .btn-preview {
-      background: #27272a;
-      color: #a1a1aa;
-    }
+        .dock-item-meta {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
 
-    .btn-preview:hover {
-      background: #3f3f46;
-      color: #fafafa;
-    }
+        .dock-item-source {
+            font-size: 10px;
+            color: #8b5cf6;
+            font-weight: 500;
+            background: rgba(139, 92, 246, 0.1);
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
 
-    .btn-delete {
-      background: transparent;
-      color: #52525b;
-    }
+        .dock-item-time {
+            font-size: 10px;
+            color: #52525b;
+        }
 
-    .btn-delete:hover {
-      background: #ef4444;
-      color: white;
-    }
+        .dock-item-actions {
+            display: flex;
+            gap: 4px;
+        }
 
-    .preview-container {
-      padding: 12px;
-      background: #0a0a0b;
-      min-height: 80px;
-      max-height: 150px;
-      overflow: hidden;
-      position: relative;
-    }
+        .dock-item-actions button {
+            width: auto;
+            padding: 4px 8px;
+            font-size: 10px;
+            background: #27272a;
+        }
 
-    .preview-root {
-      transform-origin: top left;
-      overflow: hidden;
-    }
+        .dock-item-actions .btn-copy-raw:hover,
+        .dock-item-actions .btn-copy-tw:hover {
+            opacity: 1;
+        }
 
-    .preview-overlay {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      height: 40px;
-      background: linear-gradient(transparent, #0a0a0b);
-      pointer-events: none;
-    }
+        .dock-item-actions .btn-copy-raw {
+            background: #3f3f46;
+        }
 
-    .toast {
-      position: fixed;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: #22c55e;
-      color: white;
-      padding: 8px 16px;
-      border-radius: 6px;
-      font-size: 12px;
-      font-weight: 500;
-      box-shadow: 0 4px 12px -2px rgba(34, 197, 94, 0.4);
-      animation: fadeInUp 0.3s ease;
-    }
+        .dock-item-actions .btn-copy-tw {
+            background: #06b6d4;
+            /* cyan-500 */
+        }
 
-    @keyframes fadeInUp {
-      from {
-        opacity: 0;
-        transform: translateX(-50%) translateY(10px);
-      }
-      to {
-        opacity: 1;
-        transform: translateX(-50%) translateY(0);
-      }
-    }
-  </style>
+        .dock-item-actions .btn-view:hover {
+            background: #3b82f6;
+        }
+
+        .dock-item-actions .btn-delete {
+            background: transparent;
+            color: #52525b;
+            padding: 4px 6px;
+        }
+
+        .dock-item-actions .btn-delete:hover {
+            background: #ef4444;
+            color: white;
+        }
+
+        .preview-box {
+            background: #0a0a0b;
+            border: 1px solid #27272a;
+            border-radius: 6px;
+            padding: 8px;
+            max-height: 80px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .preview-box iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            transform-origin: top left;
+            transform: scale(0.4);
+            pointer-events: none;
+        }
+
+        .preview-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 30px;
+            background: linear-gradient(transparent, #0a0a0b);
+        }
+    </style>
 </head>
+
 <body>
-  <div class="header">
-    <h1>⚡ <span>EasyDiv</span></h1>
-    <p>Steal any UI component with Tailwind CSS</p>
-  </div>
+    <div class="header">
+        <h1><span class="logo">EasyDiv</span></h1>
+        <p>Steal any UI component with Tailwind CSS</p>
+    </div>
 
-  <div class="controls">
-    <button id="toggleBtn" class="btn btn-primary">
-      <span>🎯</span> Start Inspector
-    </button>
-    <button id="clearBtn" class="btn btn-secondary">
-      <span>🗑️</span> Clear All
-    </button>
-  </div>
+    <div class="controls">
+        <button id="toggle-inspector">Activate Inspector</button>
 
-  <div id="dockList" class="dock-container">
-    <!-- Items will be rendered here -->
-  </div>
+        <div class="row">
+            <button id="copy-full-page">Copy Page</button>
+            <button id="preview-design">Preview</button>
+        </div>
 
-  <script src="popup.js"></script>
+        <div class="row">
+            <button id="clear-dock">Clear All</button>
+        </div>
+
+        <div id="status-message"></div>
+    </div>
+
+    <div class="dock-header">
+        <span>Captured Components</span>
+        <span class="count" id="dock-count">0</span>
+    </div>
+
+    <div id="dock-list" class="dock-container">
+        <!-- Items rendered here -->
+    </div>
+
+    <script src="popup.js"></script>
 </body>
+
 </html>

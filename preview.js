@@ -128,11 +128,14 @@ function renderPreview(mode) {
 
         if (pageUrl) {
             const baseTag = `<base href="${pageUrl}">`;
-            // Inject base tag carefully
+            // Also inject a viewport meta if not present to help with responsive layouts
+            const viewportMeta = `<meta name="viewport" content="width=1920">`;
+
+            // Inject base tag and viewport carefully
             if (finalDoc.includes('<head>')) {
-                finalDoc = finalDoc.replace('<head>', `<head>\n${baseTag}\n`);
+                finalDoc = finalDoc.replace('<head>', `<head>\n${baseTag}\n${viewportMeta}\n`);
             } else if (finalDoc.includes('<head ')) {
-                finalDoc = finalDoc.replace(/<head([^>]*)>/, `<head$1>\n${baseTag}\n`);
+                finalDoc = finalDoc.replace(/<head([^>]*)>/, `<head$1>\n${baseTag}\n${viewportMeta}\n`);
             }
         }
     } else {

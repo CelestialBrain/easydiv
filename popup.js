@@ -183,7 +183,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (previewBox) {
                     const iframe = document.createElement('iframe');
                     iframe.sandbox = 'allow-same-origin';
-                    iframe.style.cssText = 'width:250%;height:200px;border:none;transform:scale(0.4);transform-origin:top left;pointer-events:none;';
+                    iframe.style.cssText = 'width:250%;height:250px;border:none;transform:scale(0.4);transform-origin:top left;pointer-events:none;background:#fff;';
                     previewBox.insertBefore(iframe, previewBox.firstChild);
 
                     setTimeout(() => {
@@ -199,7 +199,7 @@ document.addEventListener("DOMContentLoaded", () => {
                                     doc.write(`<link rel="stylesheet" href="${href}">`);
                                 });
                             }
-                            doc.write(`<body style="margin:0;padding:8px;background:#0a0a0b;">${item.html}</body>`);
+                            doc.write(`<body style="margin:0;padding:8px;background:#fff;">${item.html}</body>`);
                             doc.close();
                         } catch (e) {
                             console.log('Preview error:', e);

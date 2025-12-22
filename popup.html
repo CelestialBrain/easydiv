@@ -15,7 +15,8 @@
 
         body {
             font-family: 'Inter', system-ui, -apple-system, sans-serif;
-            width: 320px;
+            width: 380px;
+            min-height: 400px;
             background: linear-gradient(145deg, #0f0f12 0%, #1a1a1f 100%);
             color: #f4f4f5;
             overflow-x: hidden;
@@ -393,17 +394,17 @@
 
         /* Preview Box */
         .preview-box {
-            background: linear-gradient(135deg, #0a0a0c 0%, #111114 100%);
-            border: 1px solid rgba(255, 255, 255, 0.06);
+            background: #ffffff;
+            border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 10px;
-            max-height: 80px;
+            height: 100px;
             overflow: hidden;
             position: relative;
         }
 
         .preview-box iframe {
-            width: 100%;
-            height: 100%;
+            width: 250%;
+            height: 250px;
             border: none;
             transform-origin: top left;
             transform: scale(0.4);
@@ -416,8 +417,8 @@
             bottom: 0;
             left: 0;
             right: 0;
-            height: 40px;
-            background: linear-gradient(transparent, rgba(10, 10, 12, 0.95));
+            height: 30px;
+            background: linear-gradient(transparent, rgba(255, 255, 255, 0.9));
             pointer-events: none;
         }
 

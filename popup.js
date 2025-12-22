@@ -269,24 +269,34 @@ document.addEventListener("DOMContentLoaded", () => {
                     previewBox.style.height = `${boxHeight}px`;
 
                     const iframe = document.createElement('iframe');
-                    iframe.sandbox = 'allow-same-origin';
-                    iframe.style.cssText = `width:${iframeWidth}px;height:${iframeHeight}px;border:none;transform:scale(${scale});transform-origin:top left;pointer-events:none;background:#fff;`;
+                    iframe.sandbox = 'allow-same-origin allow-scripts';
+                    iframe.style.cssText = `width:${iframeWidth}px;height:${iframeHeight}px;border:none;transform:scale(${scale});transform-origin:top left;pointer-events:none;background:#1a1a1f;`;
                     previewBox.insertBefore(iframe, previewBox.firstChild);
 
                     setTimeout(() => {
                         try {
                             const doc = iframe.contentDocument || iframe.contentWindow.document;
                             doc.open();
+
+                            // Start with doctype and head
+                            doc.write('<!DOCTYPE html><html><head>');
+
                             if (item.url) {
                                 doc.write(`<base href="${item.url}">`);
                             }
-                            // Inject stylesheets for preview fidelity
+
+                            // Inject Tailwind CDN for proper styling (most captured components use Tailwind)
+                            doc.write('<script src="https://cdn.tailwindcss.com"></script>');
+
+                            // Also inject original stylesheets as fallback
                             if (item.stylesheets) {
                                 item.stylesheets.forEach(href => {
-                                    doc.write(`<link rel="stylesheet" href="${href}">`);
+                                    doc.write(`<link rel="stylesheet" href="${href}" onerror="this.remove()">`);
                                 });
                             }
-                            doc.write(`<body style="margin:0;padding:8px;background:#fff;display:flex;justify-content:flex-start;align-items:flex-start;">${item.html}</body>`);
+
+                            doc.write('</head>');
+                            doc.write(`<body style="margin:0;padding:8px;background:#1a1a1f;display:flex;justify-content:flex-start;align-items:flex-start;">${item.html}</body></html>`);
                             doc.close();
                         } catch (e) {
                             console.log('Preview error:', e);

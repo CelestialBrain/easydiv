@@ -209,13 +209,68 @@ document.addEventListener("DOMContentLoaded", () => {
         </div>
       `).join("");
 
-            // Render previews in iframes
+            // Render previews in iframes with dynamic sizing
             items.forEach((item, index) => {
                 const previewBox = dockList.querySelector(`.preview-box[data-index="${index}"]`);
                 if (previewBox) {
+                    // Estimate element size from HTML to determine scale
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = item.html;
+                    const rootEl = tempDiv.firstElementChild;
+
+                    // Determine preview sizing based on element type/content
+                    let scale = 0.35;
+                    let boxHeight = 60;
+                    let iframeWidth = 340;
+                    let iframeHeight = 180;
+
+                    if (rootEl) {
+                        const tagName = rootEl.tagName.toLowerCase();
+                        const classList = rootEl.className || '';
+                        const styleAttr = rootEl.getAttribute('style') || '';
+
+                        // Check for small elements (buttons, badges, inputs)
+                        const isSmallElement = ['button', 'a', 'input', 'span', 'label', 'badge'].includes(tagName) ||
+                            classList.includes('btn') || classList.includes('button') || classList.includes('badge') ||
+                            classList.includes('chip') || classList.includes('tag');
+
+                        // Check for medium elements (cards, modals, forms)
+                        const isMediumElement = ['form', 'article', 'section', 'aside'].includes(tagName) ||
+                            classList.includes('card') || classList.includes('modal') || classList.includes('form');
+
+                        // Check for large elements (full sections, navbars, footers)
+                        const isLargeElement = ['nav', 'header', 'footer', 'main', 'div'].includes(tagName) &&
+                            (rootEl.children.length > 5 || item.html.length > 2000);
+
+                        if (isSmallElement) {
+                            // Small elements: show larger, centered
+                            scale = 1;
+                            boxHeight = 40;
+                            iframeWidth = 340;
+                            iframeHeight = 50;
+                            previewBox.classList.add('size-small');
+                        } else if (isLargeElement) {
+                            // Large elements: scale down more
+                            scale = 0.25;
+                            boxHeight = 80;
+                            iframeWidth = 1200;
+                            iframeHeight = 400;
+                            previewBox.classList.add('size-large');
+                        } else {
+                            // Medium elements: balanced
+                            scale = 0.4;
+                            boxHeight = 60;
+                            iframeWidth = 850;
+                            iframeHeight = 200;
+                            previewBox.classList.add('size-medium');
+                        }
+                    }
+
+                    previewBox.style.height = `${boxHeight}px`;
+
                     const iframe = document.createElement('iframe');
                     iframe.sandbox = 'allow-same-origin';
-                    iframe.style.cssText = 'width:250%;height:250px;border:none;transform:scale(0.4);transform-origin:top left;pointer-events:none;background:#fff;';
+                    iframe.style.cssText = `width:${iframeWidth}px;height:${iframeHeight}px;border:none;transform:scale(${scale});transform-origin:top left;pointer-events:none;background:#fff;`;
                     previewBox.insertBefore(iframe, previewBox.firstChild);
 
                     setTimeout(() => {
@@ -231,7 +286,7 @@ document.addEventListener("DOMContentLoaded", () => {
                                     doc.write(`<link rel="stylesheet" href="${href}">`);
                                 });
                             }
-                            doc.write(`<body style="margin:0;padding:8px;background:#fff;">${item.html}</body>`);
+                            doc.write(`<body style="margin:0;padding:8px;background:#fff;display:flex;justify-content:flex-start;align-items:flex-start;">${item.html}</body>`);
                             doc.close();
                         } catch (e) {
                             console.log('Preview error:', e);

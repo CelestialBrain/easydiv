@@ -109,8 +109,8 @@ function freezeElement(originalEl) {
   }
 
   // 3. Clean up the clone
-  // Remove scripts again just to be safe
-  clone.querySelectorAll('script, noscript, style').forEach(el => el.remove());
+  // Remove scripts but KEEP style tags (they contain component-specific CSS)
+  clone.querySelectorAll('script, noscript').forEach(el => el.remove());
 
   // Clean attributes
   const allClones = clone.querySelectorAll('*');

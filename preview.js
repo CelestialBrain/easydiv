@@ -29,51 +29,76 @@ chrome.storage.local.get(['stolenHTML', 'pageUrl', 'previewItem'], (result) => {
 });
 
 function processHtml(html, mode) {
-    const div = document.createElement('div');
-    div.innerHTML = html;
+    // Check if full page by looking for Doctype or html tag at the start
+    const isFullPage = /^\s*<!DOCTYPE/i.test(html) || /^\s*<html/i.test(html);
 
-    // Process full page differently? 
-    // If it's a full page capture, our "freezeElement" logic wasn't applied recursively for data-tw generally
-    // (Wait, 'copyFullPage' just grabs documentElement.outerHTML).
-    // So 'tailwind' mode only really works for 'Captured Components' via inspector, not full page copies.
-    // Full page copies don't have data-tw attributes set.
+    if (isFullPage) {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
 
-    // For components:
-    const root = div.firstElementChild;
-    if (!root) return html;
-
-    const all = [root, ...root.querySelectorAll('*')];
-    all.forEach(el => {
-        if (mode === 'tailwind') {
-            const tw = el.getAttribute('data-tw');
-            if (tw) {
-                el.className = tw;
+        // Process elements
+        doc.querySelectorAll('*').forEach(el => {
+            if (mode === 'tailwind') {
+                const tw = el.getAttribute('data-tw');
+                if (tw) {
+                    el.className = tw;
+                    el.removeAttribute('data-tw');
+                    el.removeAttribute('style');
+                }
+            } else {
                 el.removeAttribute('data-tw');
-                el.removeAttribute('style');
             }
-        } else {
-            // Original mode: just ignore data-tw, keep original classes
-            // We strip data-tw just to keep DOM clean in preview
-            el.removeAttribute('data-tw');
-        }
+            // Cleanup checks
+            el.removeAttribute('data-is-canvas');
+            el.removeAttribute('data-width');
+            el.removeAttribute('data-height');
+        });
 
-        // Cleanup internal markers
-        el.removeAttribute('data-is-canvas');
-        el.removeAttribute('data-width');
-        el.removeAttribute('data-height');
-    });
+        // Sanitize
+        doc.querySelectorAll('script, noscript').forEach(el => el.remove());
+        doc.querySelectorAll('link[href*="auth-bridge"], link[href*="login"]').forEach(el => el.remove());
+        doc.querySelectorAll('*').forEach(el => {
+            Array.from(el.attributes).forEach(attr => {
+                if (attr.name.startsWith('on')) el.removeAttribute(attr.name);
+            });
+        });
 
-    // Sanitization (Common for both)
-    let processed = root.outerHTML;
+        return doc.documentElement.outerHTML;
+    } else {
+        // Component Fragment or just body content
+        const div = document.createElement('div');
+        div.innerHTML = html;
+        const root = div.firstElementChild;
+        if (!root) return html;
 
-    // Remove scripts
-    processed = processed.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
-    processed = processed.replace(/<script[^>]*\/>/gi, '');
-    processed = processed.replace(/<noscript\b[^<]*(?:(?!<\/noscript>)<[^<]*)*<\/noscript>/gi, '');
-    processed = processed.replace(/<link[^>]+href=["'][^"']*(?:auth-bridge|login)[^"']*["'][^>]*>/gi, '');
-    processed = processed.replace(/\s+on\w+\s*=\s*["'][^"']*["']/gi, '');
+        const all = [root, ...root.querySelectorAll('*')];
+        all.forEach(el => {
+            if (mode === 'tailwind') {
+                const tw = el.getAttribute('data-tw');
+                if (tw) {
+                    el.className = tw;
+                    el.removeAttribute('data-tw');
+                    el.removeAttribute('style');
+                }
+            } else {
+                el.removeAttribute('data-tw');
+            }
 
-    return processed;
+            el.removeAttribute('data-is-canvas');
+            el.removeAttribute('data-width');
+            el.removeAttribute('data-height');
+        });
+
+        // Sanitize string
+        let processed = root.outerHTML;
+        processed = processed.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+        processed = processed.replace(/<script[^>]*\/>/gi, '');
+        processed = processed.replace(/<noscript\b[^<]*(?:(?!<\/noscript>)<[^<]*)*<\/noscript>/gi, '');
+        processed = processed.replace(/<link[^>]+href=["'][^"']*(?:auth-bridge|login)[^"']*["'][^>]*>/gi, '');
+        processed = processed.replace(/\s+on\w+\s*=\s*["'][^"']*["']/gi, '');
+
+        return processed;
+    }
 }
 
 function renderPreview(mode) {
@@ -88,22 +113,28 @@ function renderPreview(mode) {
         modeTailwindBtn.classList.add('active');
     }
 
-    const isFullPage = stolenHTML.includes('<html') || stolenHTML.includes('<!DOCTYPE');
+    const isFullPage = stolenHTML.match(/^\s*<!DOCTYPE/i) || stolenHTML.match(/^\s*<html/i);
     let content = processHtml(stolenHTML, mode);
 
     let finalDoc = '';
 
     if (isFullPage) {
         // Full Page Logic
-        finalDoc = content;
+        // DOMParser.documentElement.outerHTML doesn't include DOCTYPE, try to preserve it from original if possible
+        const doctypeMatch = stolenHTML.match(/^\s*<!DOCTYPE[^>]*>/i);
+        const doctype = doctypeMatch ? doctypeMatch[0] : '<!DOCTYPE html>';
+
+        finalDoc = doctype + '\n' + content;
+
         if (pageUrl) {
             const baseTag = `<base href="${pageUrl}">`;
+            // Inject base tag carefully
             if (finalDoc.includes('<head>')) {
                 finalDoc = finalDoc.replace('<head>', `<head>\n${baseTag}\n`);
+            } else if (finalDoc.includes('<head ')) {
+                finalDoc = finalDoc.replace(/<head([^>]*)>/, `<head$1>\n${baseTag}\n`);
             }
         }
-        // Inject Tailwind if needed? Full page usually doesn't have data-tw, so this might be moot.
-        // But if we ever support full page analysis, we'd add <script src="cdn..."></script> here.
     } else {
         // Component Logic
         let headContent = `

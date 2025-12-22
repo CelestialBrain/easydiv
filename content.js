@@ -14,41 +14,225 @@ const TW_MAP = {
   "cursor": { "pointer": "cursor-pointer", "not-allowed": "cursor-not-allowed" }
 };
 
-function generateTailwindClasses(computed) {
+const TW_SPACING_MAP = {
+  '0px': '0', '1px': 'px', '2px': '0.5', '4px': '1', '6px': '1.5', '8px': '2',
+  '10px': '2.5', '12px': '3', '14px': '3.5', '16px': '4', '20px': '5', '24px': '6',
+  '28px': '7', '32px': '8', '36px': '9', '40px': '10', '44px': '11', '48px': '12',
+  '56px': '14', '64px': '16', '80px': '20', '96px': '24', '112px': '28', '128px': '32',
+  '144px': '36', '160px': '40', '176px': '44', '192px': '48', '208px': '52', '224px': '56',
+  '240px': '60', '256px': '64', '288px': '72', '320px': '80', '384px': '96'
+};
+
+// Parse map into a sorted array of numbers for nearest neighbor search
+const TW_VALUES = Object.keys(TW_SPACING_MAP)
+  .map(k => parseFloat(k))
+  .sort((a, b) => a - b);
+
+function pxToTw(val) {
+  if (!val || val === '0px' || val === 'auto' || val === '0') return null;
+  if (TW_SPACING_MAP[val]) return TW_SPACING_MAP[val];
+
+  const isNegative = val.startsWith('-');
+  const px = parseFloat(val);
+  if (isNaN(px)) return `[${val}]`;
+
+  const absPx = Math.abs(px);
+
+  let closest = TW_VALUES[0];
+  let minDiff = Math.abs(absPx - closest);
+
+  for (let i = 1; i < TW_VALUES.length; i++) {
+    const diff = Math.abs(absPx - TW_VALUES[i]);
+    if (diff <= minDiff) { // Use <= to prefer larger value on ties (round up)
+      minDiff = diff;
+      closest = TW_VALUES[i];
+    }
+  }
+
+  // Snap if within reasonable distance (e.g. 2.5px)
+  // 17px -> 16px (diff 1) -> OK
+  // 15px -> 16px (diff 1) -> OK
+  // 2.4px -> 2px  (diff 0.4) -> OK 
+  let twValue;
+  if (minDiff <= 2.5) {
+    twValue = TW_SPACING_MAP[`${closest}px`];
+  } else {
+    twValue = `[${absPx}px]`;
+  }
+
+  return isNegative ? `-${twValue}` : twValue;
+}
+
+function normalizeColor(color) {
+  if (!color || color === 'rgba(0, 0, 0, 0)' || color === 'transparent') return null;
+
+  // Handle RGBA with alpha
+  const rgbaMatch = color.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+  if (rgbaMatch) {
+    const [_, r, g, b, a] = rgbaMatch;
+    // If alpha is undefined or 1, it's solid
+    if (!a || parseFloat(a) >= 1) {
+      return `[rgb(${r},${g},${b})]`;
+    } else {
+      // Convert alpha to percentage for Tailwind opacity modifier
+      // .bg-blue-500/50
+      // We can't easily map distinct RGB to a color name without a massive library.
+      // So use arbitrary value with opacity: bg-[rgba(r,g,b,a)]
+      return `[${color.replace(/\s/g, '')}]`;
+    }
+  }
+  return `[${color.replace(/\s/g, '')}]`;
+}
+
+function generateTailwindClasses(computed, element) {
   let classes = [];
 
-  // 1. Map keywords
+  // FILTER DEFAULTS: Only output if it deviates from browser default
+  const tagName = element.tagName.toLowerCase();
+
+  // 1. Map keywords with Bloat Filtering
+  const isFlex = computed.display === 'flex' || computed.display === 'inline-flex';
+  const isGrid = computed.display === 'grid' || computed.display === 'inline-grid';
+
   for (const [prop, map] of Object.entries(TW_MAP)) {
     const val = computed.getPropertyValue(prop);
+
+    // Skip defaults
+    if (prop === 'display' && val === 'block' && tagName === 'div') continue;
+    if (prop === 'display' && val === 'inline' && tagName === 'span') continue;
+    if (prop === 'position' && val === 'static') continue;
+    if (prop === 'flex-direction' && val === 'row' && isFlex) continue; // Row is default for flex
+    if (prop === 'flex-wrap' && val === 'nowrap') continue;
+    if (prop === 'align-items' && val === 'normal') continue;
+    if (prop === 'justify-content' && val === 'normal') continue;
+
     if (map[val]) classes.push(map[val]);
   }
 
-  // 2. Map dimensions & colors using arbitrary values (JIT)
-  // This ensures pixel-perfect copying without massive config files
-  const props = [
+  // 2. Map dimensions & colors with Smart Conversion
+  const spacingProps = [
     { css: 'width', tw: 'w' }, { css: 'height', tw: 'h' },
     { css: 'min-width', tw: 'min-w' }, { css: 'min-height', tw: 'min-h' },
     { css: 'margin-top', tw: 'mt' }, { css: 'margin-right', tw: 'mr' }, { css: 'margin-bottom', tw: 'mb' }, { css: 'margin-left', tw: 'ml' },
     { css: 'padding-top', tw: 'pt' }, { css: 'padding-right', tw: 'pr' }, { css: 'padding-bottom', tw: 'pb' }, { css: 'padding-left', tw: 'pl' },
-    { css: 'font-size', tw: 'text' }, { css: 'line-height', tw: 'leading' },
-    { css: 'border-radius', tw: 'rounded' }, { css: 'z-index', tw: 'z' },
-    { css: 'top', tw: 'top' }, { css: 'left', tw: 'left' }
+    { css: 'top', tw: 'top' }, { css: 'left', tw: 'left' }, { css: 'right', tw: 'right' }, { css: 'bottom', tw: 'bottom' },
+    { css: 'gap', tw: 'gap' }, { css: 'border-radius', tw: 'rounded' }
   ];
 
-  props.forEach(({ css, tw }) => {
+  spacingProps.forEach(({ css, tw }) => {
     let val = computed.getPropertyValue(css);
-    if (!val || val === 'auto' || val === '0px' || val === 'none' || val === 'static' || val === 'rgba(0, 0, 0, 0)') return;
-    classes.push(`${tw}-[${val}]`);
+
+    // Check Inline Style for Percentages first (Structural Edge Case)
+    // computed style always returns pixels for percentages, destroying responsiveness.
+    if (element.style && element.style[css] && element.style[css].includes('%')) {
+      const pct = element.style[css];
+      if (pct === '50%') { classes.push(`${tw}-1/2`); return; }
+      if (pct === '33.33%') { classes.push(`${tw}-1/3`); return; }
+      if (pct === '66.66%') { classes.push(`${tw}-2/3`); return; }
+      if (pct === '25%') { classes.push(`${tw}-1/4`); return; }
+      if (pct === '75%') { classes.push(`${tw}-3/4`); return; }
+      if (pct === '100%') { classes.push(`${tw}-full`); return; }
+      // Fallback to arbitrary percentage
+      classes.push(`${tw}-[${pct}]`);
+      return;
+    }
+
+    if (!val || val === 'auto' || val === '0px' || val === 'none' || val === 'static') return;
+
+    // Convert to Tailwind scale
+    const twValue = pxToTw(val);
+    if (twValue) classes.push(`${tw}-${twValue}`);
   });
 
-  // Colors
+  // Z-Index (Structural)
+  const zIndex = computed.getPropertyValue('z-index');
+  if (zIndex && zIndex !== 'auto') {
+    const zInt = parseInt(zIndex);
+    if (zInt >= 0 && zInt <= 50 && zInt % 10 === 0) classes.push(`z-${zInt}`);
+    else classes.push(`z-[${zIndex}]`);
+  }
+
+  // Fonts
+  const fontSize = computed.getPropertyValue('font-size');
+  if (fontSize) {
+    if (fontSize === '14px') classes.push('text-sm');
+    else if (fontSize === '16px') classes.push('text-base');
+    else if (fontSize === '18px') classes.push('text-lg');
+    else if (fontSize === '20px') classes.push('text-xl');
+    else if (fontSize === '12px') classes.push('text-xs');
+    else if (fontSize === '24px') classes.push('text-2xl');
+    else if (fontSize === '30px') classes.push('text-3xl');
+    else if (fontSize === '36px') classes.push('text-4xl');
+    else {
+      const twVal = pxToTw(fontSize);
+      classes.push(twVal.startsWith('[') ? `text-[${fontSize}]` : `text-[${fontSize}]`); // Font size usually specific
+    }
+  }
+
+  // Colors (Smart Handling)
   const bg = computed.getPropertyValue('background-color');
-  if (bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent') classes.push(`bg-[${bg.replace(/\s/g, '')}]`);
+  const bgTw = normalizeColor(bg);
+  if (bgTw) classes.push(`bg-${bgTw}`);
+
+  // Gradients (Background Image)
+  const bgImg = computed.getPropertyValue('background-image');
+  if (bgImg && bgImg !== 'none' && bgImg.includes('gradient')) {
+    // Gradients are too complex to map to from-x to-y accurately without AI
+    // Use arbitrary value
+    classes.push(`bg-[${bgImg.replace(/\s+/g, '')}]`);
+  }
 
   const col = computed.getPropertyValue('color');
-  if (col) classes.push(`text-[${col.replace(/\s/g, '')}]`);
+  const colTw = normalizeColor(col);
+  // Only output color if it's not inherited/black (reduce bloat)? 
+  // No, text color is widely inherited so explicit is safer, but maybe check if parent has same color?
+  // For now, explicit is better for copy/paste utility.
+  if (colTw) classes.push(`text-${colTw}`);
 
   return classes.join(' ');
+}
+
+// --- INLINE STYLE GENERATION (UNIVERSAL) ---
+function generateInlineStyles(computed) {
+  const props = [
+    // Layout
+    'display', 'position', 'top', 'left', 'right', 'bottom', 'z-index',
+    'overflow', 'overflow-x', 'overflow-y',
+
+    // Flex/Grid
+    'flex-direction', 'flex-wrap', 'justify-content', 'align-items', 'gap',
+    'flex-grow', 'flex-shrink', 'flex-basis',
+
+    // Dimensions & Spacing
+    'width', 'height', 'min-width', 'min-height', 'max-width', 'max-height',
+    'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
+    'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
+
+    // Typography
+    'font-family', 'font-size', 'font-weight', 'line-height', 'text-align',
+    'color', 'text-decoration', 'text-transform', 'letter-spacing',
+
+    // Appearance
+    'background-color', 'background-image', 'background-size', 'background-position',
+    'border-top-width', 'border-right-width', 'border-bottom-width', 'border-left-width',
+    'border-top-style', 'border-right-style', 'border-bottom-style', 'border-left-style',
+    'border-top-color', 'border-right-color', 'border-bottom-color', 'border-left-color',
+    'border-radius', 'box-shadow', 'opacity', 'visibility'
+  ];
+
+  let styleString = '';
+
+  props.forEach(prop => {
+    const val = computed.getPropertyValue(prop);
+    // Filter default/empty values to keep size down
+    if (val && val !== 'auto' && val !== 'normal' && val !== 'none' &&
+      val !== '0px' && val !== 'rgba(0, 0, 0, 0)' && val !== 'transparent' &&
+      val !== 'static' && val !== 'visible') {
+      styleString += `${prop}: ${val}; `;
+    }
+  });
+
+  return styleString.trim();
 }
 
 // --- LOTTIE DETECTION ---
@@ -125,6 +309,12 @@ function freezeElement(originalEl) {
     const twClasses = generateTailwindClasses(computed);
     if (twClasses) {
       currentClone.setAttribute('data-tw', twClasses);
+    }
+
+    // Generate Inline Styles (Universal)
+    const inlineStyles = generateInlineStyles(computed);
+    if (inlineStyles) {
+      currentClone.setAttribute('data-inline-style', inlineStyles);
     }
 
     // Fix images

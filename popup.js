@@ -153,13 +153,20 @@ document.addEventListener("DOMContentLoaded", () => {
                     el.className = tw; // Replace classes with Tailwind
                     el.removeAttribute('data-tw');
                     el.removeAttribute('style'); // Remove inline styles as we are using pure TW
-                } else {
-                    // If no TW data, maybe keep original class? 
-                    // Or keep it plain. Let's keep original class if TW not present.
                 }
+                el.removeAttribute('data-inline-style'); // Cleanup unused data
+            } else if (mode === 'universal') {
+                const inlineStyle = el.getAttribute('data-inline-style');
+                if (inlineStyle) {
+                    el.setAttribute('style', inlineStyle); // Apply baked computed styles
+                    el.removeAttribute('class'); // Remove original classes as they won't work externally
+                    el.removeAttribute('data-inline-style');
+                }
+                el.removeAttribute('data-tw'); // Cleanup unused data
             } else {
-                // Clean mode: just remove data-tw
+                // Raw mode: just remove helper data
                 el.removeAttribute('data-tw');
+                el.removeAttribute('data-inline-style');
                 // Keep inline styles and original classes
             }
 
@@ -199,6 +206,7 @@ document.addEventListener("DOMContentLoaded", () => {
             <div class="dock-item-actions">
               <button class="btn-copy-raw" data-index="${index}" title="Copy HTML with original classes">HTML</button>
               <button class="btn-copy-tw" data-index="${index}" title="Copy with Tailwind CSS">TW</button>
+              <button class="btn-copy-uni" data-index="${index}" title="Copy with Universal Inline Styles">UNI</button>
               <button class="btn-view" data-index="${index}">View</button>
               <button class="btn-delete" data-index="${index}">×</button>
             </div>
@@ -346,6 +354,26 @@ document.addEventListener("DOMContentLoaded", () => {
                     const twHtml = processHtmlForCopy(items[index].html, 'tailwind');
                     navigator.clipboard.writeText(twHtml).then(() => {
                         setStatus("Copied Tailwind!");
+                        const originalText = e.target.textContent;
+                        e.target.textContent = "OK";
+                        setTimeout(() => { e.target.textContent = originalText; }, 1000);
+                    });
+                }, 10);
+            });
+        });
+
+        // Copy UNIVERSAL (Inline Styles)
+        document.querySelectorAll(".btn-copy-uni").forEach(btn => {
+            btn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const index = parseInt(e.target.dataset.index);
+
+                setStatus("Generating Universal HTML...");
+
+                setTimeout(() => {
+                    const uniHtml = processHtmlForCopy(items[index].html, 'universal');
+                    navigator.clipboard.writeText(uniHtml).then(() => {
+                        setStatus("Copied Universal HTML!");
                         const originalText = e.target.textContent;
                         e.target.textContent = "OK";
                         setTimeout(() => { e.target.textContent = originalText; }, 1000);

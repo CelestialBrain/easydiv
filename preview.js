@@ -131,11 +131,18 @@ function renderPreview(mode) {
             // Also inject a viewport meta if not present to help with responsive layouts
             const viewportMeta = `<meta name="viewport" content="width=1920">`;
 
-            // Inject base tag and viewport carefully
+            // Detect Lottie and inject library if needed
+            const hasLottie = content.includes('__lottie_element') ||
+                content.includes('lottie-player') ||
+                content.includes('bodymovin');
+            const lottieScript = hasLottie ?
+                '<script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js"></script>' : '';
+
+            // Inject base tag, viewport, and Lottie carefully
             if (finalDoc.includes('<head>')) {
-                finalDoc = finalDoc.replace('<head>', `<head>\n${baseTag}\n${viewportMeta}\n`);
+                finalDoc = finalDoc.replace('<head>', `<head>\n${baseTag}\n${viewportMeta}\n${lottieScript}\n`);
             } else if (finalDoc.includes('<head ')) {
-                finalDoc = finalDoc.replace(/<head([^>]*)>/, `<head$1>\n${baseTag}\n${viewportMeta}\n`);
+                finalDoc = finalDoc.replace(/<head([^>]*)>/, `<head$1>\n${baseTag}\n${viewportMeta}\n${lottieScript}\n`);
             }
         }
     } else {

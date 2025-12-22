@@ -288,6 +288,11 @@ document.addEventListener("DOMContentLoaded", () => {
                             // Inject Tailwind CDN for proper styling (most captured components use Tailwind)
                             doc.write('<script src="https://cdn.tailwindcss.com"></script>');
 
+                            // Inject Lottie library if Lottie animation was detected
+                            if (item.hasLottie) {
+                                doc.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.12.2/lottie.min.js"></script>');
+                            }
+
                             // Also inject original stylesheets as fallback
                             if (item.stylesheets) {
                                 item.stylesheets.forEach(href => {

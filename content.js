@@ -51,6 +51,58 @@ function generateTailwindClasses(computed) {
   return classes.join(' ');
 }
 
+// --- LOTTIE DETECTION ---
+function detectLottie(element) {
+  // Check for Lottie indicators
+  const hasLottieId = element.querySelector('[id*="__lottie_element"]') !== null;
+  const hasLottiePlayer = element.querySelector('lottie-player, dotlottie-player') !== null;
+  const hasSvgMasks = element.querySelectorAll('svg mask').length > 3; // Lottie uses many masks
+  const hasBodymovinClass = element.querySelector('[class*="bodymovin"]') !== null;
+
+  return hasLottieId || hasLottiePlayer || hasSvgMasks || hasBodymovinClass;
+}
+
+function extractLottieData() {
+  // Try to find Lottie animation data in global scope
+  const lottieData = [];
+
+  // Check for lottie global objects
+  if (typeof window.lottie !== 'undefined') {
+    try {
+      const animations = window.lottie.getRegisteredAnimations?.() || [];
+      animations.forEach((anim, i) => {
+        if (anim.animationData) {
+          lottieData.push({
+            index: i,
+            data: JSON.stringify(anim.animationData).substring(0, 50000) // Limit size
+          });
+        }
+      });
+    } catch (e) {
+      console.log('EasyDiv: Could not extract Lottie data', e);
+    }
+  }
+
+  // Check for bodymovin
+  if (typeof window.bodymovin !== 'undefined') {
+    try {
+      const animations = window.bodymovin.getRegisteredAnimations?.() || [];
+      animations.forEach((anim, i) => {
+        if (anim.animationData) {
+          lottieData.push({
+            index: i,
+            data: JSON.stringify(anim.animationData).substring(0, 50000)
+          });
+        }
+      });
+    } catch (e) {
+      console.log('EasyDiv: Could not extract bodymovin data', e);
+    }
+  }
+
+  return lottieData;
+}
+
 // --- CLONER ---
 function freezeElement(originalEl) {
   if (originalEl.checkVisibility && !originalEl.checkVisibility()) return null;
@@ -176,13 +228,19 @@ function saveToDock(el) {
     .map(link => link.href)
     .filter(href => href && !href.includes('chrome-extension://'));
 
+  // Detect Lottie animations
+  const hasLottie = detectLottie(el);
+  const lottieData = hasLottie ? extractLottieData() : [];
+
   const newItem = {
     id: Date.now(),
     timestamp: new Date().toLocaleTimeString(),
     source: window.location.hostname,
     url: window.location.href,
     html: frozenHTML,
-    stylesheets: stylesheets
+    stylesheets: stylesheets,
+    hasLottie: hasLottie,
+    lottieData: lottieData
   };
 
   chrome.storage.local.get({ dockItems: [] }, (result) => {
@@ -191,7 +249,8 @@ function saveToDock(el) {
     if (items.length > 20) items.pop();
 
     chrome.storage.local.set({ dockItems: items }, () => {
-      showToast("Captured! (Saved to Dock)");
+      const msg = hasLottie ? "Captured! (Lottie animation detected)" : "Captured! (Saved to Dock)";
+      showToast(msg);
     });
   });
 }

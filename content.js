@@ -280,6 +280,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.action === "getRawCode") {
+    // Only respond from the TOP frame to avoid capturing iframe content (like Lovable preview)
+    if (window !== window.top) {
+      // Don't respond from iframes - let the top frame handle it
+      return false;
+    }
+
     try {
       // For very large pages, this might be slow
       const html = document.documentElement.outerHTML;
@@ -303,7 +309,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.action === "ping") {
-    sendResponse({ status: "alive" });
+    // Only respond from top frame
+    if (window === window.top) {
+      sendResponse({ status: "alive" });
+    }
   }
 
   return true;

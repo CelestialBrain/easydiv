@@ -69,9 +69,21 @@ document.addEventListener("DOMContentLoaded", () => {
     copyBtn.onclick = () => {
         chrome.tabs.query({ active: true, currentWindow: true }, ([tab]) => {
             setStatus("Copying...");
+
+            // Set a timeout in case the operation hangs
+            const timeout = setTimeout(() => {
+                setStatus("Copy timed out - page too large?");
+            }, 10000);
+
             chrome.tabs.sendMessage(tab.id, { action: "copyFullPage" }, (res) => {
-                if (res?.success) setStatus("Full page copied!");
-                else setStatus("Copy failed");
+                clearTimeout(timeout);
+                if (chrome.runtime.lastError) {
+                    setStatus("Error: " + chrome.runtime.lastError.message);
+                } else if (res?.success) {
+                    setStatus("Full page copied!");
+                } else {
+                    setStatus("Copy failed: " + (res?.error || "Unknown error"));
+                }
             });
         });
     };
@@ -81,7 +93,17 @@ document.addEventListener("DOMContentLoaded", () => {
             ensureContent(tab.id, () => {
                 setStatus("Capturing...");
 
+                // Set a timeout for large pages
+                const timeout = setTimeout(() => {
+                    setStatus("Capture timed out - page too large?");
+                }, 15000);
+
                 chrome.tabs.sendMessage(tab.id, { action: "getRawCode" }, (res) => {
+                    clearTimeout(timeout);
+                    if (chrome.runtime.lastError) {
+                        setStatus("Error: " + chrome.runtime.lastError.message);
+                        return;
+                    }
                     if (res && res.success) {
                         chrome.storage.local.set({
                             'stolenHTML': res.html,
@@ -91,7 +113,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             window.close();
                         });
                     } else {
-                        setStatus("Failed to capture");
+                        setStatus("Failed: " + (res?.error || "Could not capture page"));
                     }
                 });
             });

@@ -251,8 +251,13 @@ function toggleInspection(active) {
 }
 
 function copyFullPage() {
-  const html = document.documentElement.outerHTML;
-  return navigator.clipboard.writeText(html);
+  try {
+    const html = document.documentElement.outerHTML;
+    return navigator.clipboard.writeText(html);
+  } catch (e) {
+    console.error('EasyDiv: Failed to copy page', e);
+    return Promise.reject(e);
+  }
 }
 
 // Message Bus
@@ -263,18 +268,33 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.action === "copyFullPage") {
-    copyFullPage().then(() => {
-      sendResponse({ success: true });
-    });
+    copyFullPage()
+      .then(() => {
+        sendResponse({ success: true });
+      })
+      .catch((err) => {
+        console.error('EasyDiv: Copy failed', err);
+        sendResponse({ success: false, error: err.message });
+      });
     return true;
   }
 
   if (request.action === "getRawCode") {
-    sendResponse({
-      success: true,
-      html: document.documentElement.outerHTML,
-      url: window.location.href
-    });
+    try {
+      // For very large pages, this might be slow
+      const html = document.documentElement.outerHTML;
+      sendResponse({
+        success: true,
+        html: html,
+        url: window.location.href
+      });
+    } catch (e) {
+      console.error('EasyDiv: Failed to get raw code', e);
+      sendResponse({
+        success: false,
+        error: e.message
+      });
+    }
     return true;
   }
 

@@ -270,7 +270,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
                     const iframe = document.createElement('iframe');
                     iframe.sandbox = 'allow-same-origin allow-scripts';
-                    iframe.style.cssText = `width:${iframeWidth}px;height:${iframeHeight}px;border:none;transform:scale(${scale});transform-origin:top left;pointer-events:none;background:#1a1a1f;`;
+                    iframe.style.cssText = `width:${iframeWidth}px;height:${iframeHeight}px;border:none;transform:scale(${scale});transform-origin:top left;pointer-events:none;background:transparent;`;
                     previewBox.insertBefore(iframe, previewBox.firstChild);
 
                     setTimeout(() => {
@@ -296,7 +296,8 @@ document.addEventListener("DOMContentLoaded", () => {
                             }
 
                             doc.write('</head>');
-                            doc.write(`<body style="margin:0;padding:8px;background:#1a1a1f;display:flex;justify-content:flex-start;align-items:flex-start;">${item.html}</body></html>`);
+                            // Use transparent background so the component's own bg shows
+                            doc.write(`<body style="margin:0;padding:4px;background:transparent;">${item.html}</body></html>`);
                             doc.close();
                         } catch (e) {
                             console.log('Preview error:', e);

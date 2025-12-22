@@ -287,8 +287,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
 
     try {
-      // For very large pages, this might be slow
-      const html = document.documentElement.outerHTML;
+      // Clone the document to avoid modifying the actual page
+      const clonedDoc = document.documentElement.cloneNode(true);
+
+      // Remove EasyDiv elements (highlighter, toast) so they don't appear in preview
+      clonedDoc.querySelectorAll('#easydiv-highlighter, #easydiv-toast').forEach(el => el.remove());
+
+      const html = clonedDoc.outerHTML;
       sendResponse({
         success: true,
         html: html,

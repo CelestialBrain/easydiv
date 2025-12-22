@@ -75,14 +75,24 @@ document.addEventListener("DOMContentLoaded", () => {
                 setStatus("Copy timed out - page too large?");
             }, 10000);
 
-            chrome.tabs.sendMessage(tab.id, { action: "copyFullPage" }, (res) => {
+            // Get the HTML from content script, then copy in popup (which is focused)
+            chrome.tabs.sendMessage(tab.id, { action: "getRawCode" }, (res) => {
                 clearTimeout(timeout);
                 if (chrome.runtime.lastError) {
                     setStatus("Error: " + chrome.runtime.lastError.message);
-                } else if (res?.success) {
-                    setStatus("Full page copied!");
+                    return;
+                }
+                if (res?.success && res.html) {
+                    // Copy in the popup context (it's focused)
+                    navigator.clipboard.writeText(res.html)
+                        .then(() => {
+                            setStatus("Full page copied!");
+                        })
+                        .catch((err) => {
+                            setStatus("Copy failed: " + err.message);
+                        });
                 } else {
-                    setStatus("Copy failed: " + (res?.error || "Unknown error"));
+                    setStatus("Failed to get page HTML");
                 }
             });
         });

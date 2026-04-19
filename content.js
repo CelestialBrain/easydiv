@@ -70,6 +70,47 @@ function pxToTw(val) {
   return isNegative ? `-${twValue}` : twValue;
 }
 
+// Minimal Tailwind-style preflight. Prepended to extraCss when copying in
+// Universal/JSX modes so captures render correctly in contexts without a
+// global CSS reset (plain HTML, CMS templates, email editors). Skips Tailwind
+// and raw modes — those already have their own resets / preserve originals.
+//
+// Based on Tailwind's preflight v3. Trimmed comments, single-line for travel.
+const PREFLIGHT_CSS = [
+  '*,::before,::after{box-sizing:border-box;border-width:0;border-style:solid}',
+  'html{line-height:1.5;-webkit-text-size-adjust:100%;tab-size:4}',
+  'body{margin:0;line-height:inherit}',
+  'hr{height:0;color:inherit;border-top-width:1px}',
+  'abbr:where([title]){text-decoration:underline dotted}',
+  'h1,h2,h3,h4,h5,h6{font-size:inherit;font-weight:inherit;margin:0}',
+  'a{color:inherit;text-decoration:inherit}',
+  'b,strong{font-weight:bolder}',
+  'small{font-size:80%}',
+  'table{text-indent:0;border-color:inherit;border-collapse:collapse}',
+  'button,input,optgroup,select,textarea{font-family:inherit;font-feature-settings:inherit;font-variation-settings:inherit;font-size:100%;font-weight:inherit;line-height:inherit;color:inherit;margin:0;padding:0}',
+  'button,select{text-transform:none}',
+  "button,[type='button'],[type='reset'],[type='submit']{-webkit-appearance:button;background-color:transparent;background-image:none}",
+  ':-moz-focusring{outline:auto}',
+  ':-moz-ui-invalid{box-shadow:none}',
+  'progress{vertical-align:baseline}',
+  '::-webkit-inner-spin-button,::-webkit-outer-spin-button{height:auto}',
+  "[type='search']{-webkit-appearance:textfield;outline-offset:-2px}",
+  '::-webkit-search-decoration{-webkit-appearance:none}',
+  '::-webkit-file-upload-button{-webkit-appearance:button;font:inherit}',
+  'summary{display:list-item}',
+  'blockquote,dl,dd,figure,pre{margin:0}',
+  'fieldset{margin:0;padding:0}',
+  'legend{padding:0}',
+  'ol,ul,menu{list-style:none;margin:0;padding:0}',
+  'textarea{resize:vertical}',
+  'input::placeholder,textarea::placeholder{opacity:1;color:#9ca3af}',
+  'button,[role="button"]{cursor:pointer}',
+  ':disabled{cursor:default}',
+  'img,svg,video,canvas,audio,iframe,embed,object{display:block;vertical-align:middle}',
+  'img,video{max-width:100%;height:auto}',
+  '[hidden]{display:none}'
+].join('');
+
 // Tailwind v3 default color palette. Matching a computed rgb to one of these
 // lets us emit `bg-red-500` instead of `bg-[rgb(239,68,68)]` — big UX win, and
 // a gap in DivMagic's output.
@@ -627,7 +668,11 @@ function genSpacing(cs, element, out) {
     if (css === 'width' && isLayoutDerivedWidth(val)) continue;
 
     const twVal = pxToTw(val);
-    if (twVal) out.push(`${tw}-${twVal}`);
+    if (!twVal) continue;
+    // Tailwind's negative modifier goes in FRONT of the property: `-bottom-[120px]`,
+    // not `bottom--[120px]`. pxToTw returns values prefixed with `-` for negatives.
+    if (twVal.startsWith('-')) out.push(`-${tw}-${twVal.slice(1)}`);
+    else out.push(`${tw}-${twVal}`);
   }
 
   // z-index
@@ -1117,6 +1162,7 @@ function mediaToPrefix(mediaText) {
 function buildRuleCache() {
   const cache = [];
   const keyframes = {};
+  const fontFaces = []; // @font-face rule cssText, keyed by family name later
 
   const walk = (rules, mediaPrefix) => {
     for (const rule of rules) {
@@ -1134,6 +1180,14 @@ function buildRuleCache() {
         walk(rule.cssRules, mediaPrefix);
       } else if (rule.type === CSSRule.KEYFRAMES_RULE) {
         keyframes[rule.name] = rule.cssText;
+      } else if (rule.type === CSSRule.FONT_FACE_RULE) {
+        // Keep the whole @font-face rule text — includes src: url(...) etc.
+        // Extract the font-family so we can only emit the ones the capture uses.
+        const familyMatch = rule.cssText.match(/font-family:\s*(['"]?)([^;'"]+)\1/i);
+        fontFaces.push({
+          family: familyMatch ? familyMatch[2].trim() : null,
+          cssText: rule.cssText
+        });
       }
     }
   };
@@ -1146,7 +1200,7 @@ function buildRuleCache() {
     }
   }
 
-  return { rules: cache, keyframes };
+  return { rules: cache, keyframes, fontFaces };
 }
 
 // Split "a.btn:hover::before" → { baseSelector: "a.btn", statePrefix: "hover:" }
@@ -1286,6 +1340,66 @@ const PSEUDO_PROPS = [
   'box-shadow', 'transform', 'transform-origin', 'opacity', 'z-index',
   'text-align', 'text-transform', 'letter-spacing'
 ];
+
+// Walk up the captured element's ancestor chain to collect context styles —
+// the ones that "cascade" visually but live on a parent we're NOT capturing.
+// Without this, components like Discord's dark-bg header appear on white
+// when reproduced standalone, because the dark bg lives on <body>/<main>.
+//
+// Returns:
+//   {
+//     pageBg:     first opaque background we hit walking up (color or image)
+//     color:      first inherited text color
+//     fontFamily: first inherited font family
+//     parentLayout: { display, flex/grid props, width } when parent is flex/grid
+//   }
+// Called at freeze time, before the walk — uses a passed getComputedStyle fn so
+// iframe-interior elements resolve against their own defaultView.
+function captureAncestorContext(element, getCs) {
+  if (!element || !element.parentElement) return null;
+  const ctx = {};
+
+  // Immediate parent layout — if flex/grid, the captured element renders
+  // according to its parent's rules (main-axis direction, gap, wrap). Without
+  // replicating that in the copy, flex children collapse or stack wrong.
+  const parent = element.parentElement;
+  const pcs = getCs(parent);
+  if (/^(flex|inline-flex|grid|inline-grid)$/.test(pcs.display)) {
+    ctx.parentLayout = {
+      display: pcs.display,
+      flexDirection: pcs.flexDirection,
+      flexWrap: pcs.flexWrap,
+      justifyContent: pcs.justifyContent,
+      alignItems: pcs.alignItems,
+      gap: pcs.gap,
+      gridTemplateColumns: pcs.gridTemplateColumns,
+      gridTemplateRows: pcs.gridTemplateRows,
+      // Width matters so flex/grid math has something to distribute
+      width: pcs.width
+    };
+  }
+
+  // Page-level visual context: bg (color + image), font-family, color.
+  // Walk from element's parent up toward documentElement, stopping at first
+  // non-transparent bg. Fonts + color: first non-inherited values.
+  let walker = parent;
+  while (walker && walker !== document.documentElement) {
+    const wcs = getCs(walker);
+    if (!ctx.pageBg) {
+      const bgImg = wcs.backgroundImage;
+      const bgCol = wcs.backgroundColor;
+      const hasImg = bgImg && bgImg !== 'none';
+      const hasCol = bgCol && bgCol !== 'rgba(0, 0, 0, 0)' && bgCol !== 'transparent';
+      if (hasImg && hasCol) ctx.pageBg = `${bgImg}, ${bgCol}`;
+      else if (hasImg) ctx.pageBg = bgImg;
+      else if (hasCol) ctx.pageBg = bgCol;
+    }
+    if (!ctx.color) ctx.color = wcs.color;
+    if (!ctx.fontFamily) ctx.fontFamily = wcs.fontFamily;
+    walker = walker.parentElement;
+  }
+  return ctx;
+}
 
 function capturePseudos(element) {
   let cssText = '';
@@ -1541,12 +1655,55 @@ function freezeElement(originalEl, ruleCacheIn) {
     try { a.href = new URL(a.getAttribute('href'), document.baseURI).href; } catch (e) { }
   });
 
-  // Assemble traveling <style> block
+  // Harvest @font-face rules whose families are referenced by the captured
+  // tree. Without this, captured components fall back to system fonts when
+  // pasted into a destination that doesn't already import the brand font.
+  // We DON'T fetch + base64 — we just carry the original @font-face rules
+  // (with their url() src) so the destination browser fetches them.
+  // Most sites allow cross-origin font loads via CORS headers.
+  const fontCss = [];
+  try {
+    const usedFamilies = new Set();
+    const collectFamily = (el) => {
+      const inline = el.getAttribute && el.getAttribute('data-inline-style');
+      if (!inline) return;
+      const m = inline.match(/font-family:\s*([^;]+)/i);
+      if (!m) return;
+      // Split the stack on commas, strip quotes + whitespace
+      for (const tok of m[1].split(',')) {
+        const clean = tok.trim().replace(/^["']|["']$/g, '').toLowerCase();
+        if (clean) usedFamilies.add(clean);
+      }
+    };
+    collectFamily(clone);
+    clone.querySelectorAll('[data-inline-style]').forEach(collectFamily);
+
+    for (const ff of (ruleCache.fontFaces || [])) {
+      if (!ff.family) continue;
+      if (usedFamilies.has(ff.family.toLowerCase())) {
+        fontCss.push(ff.cssText);
+      }
+    }
+  } catch (e) { /* best effort */ }
+
+  // Assemble traveling <style> block — order: fonts first (so @font-face
+  // rules register before anything tries to use them), then pseudo, keyframes,
+  // shadow DOM CSS.
   const keyframeCss = Object.values(keyframesUsed).join('\n');
   const shadowCssBlock = shadowCss.join('\n');
-  const extraCss = [pseudoCss.join(''), keyframeCss, shadowCssBlock].filter(Boolean).join('\n');
+  const extraCss = [
+    fontCss.join('\n'),
+    pseudoCss.join(''),
+    keyframeCss,
+    shadowCssBlock
+  ].filter(Boolean).join('\n');
 
-  return { clone, extraCss };
+  // Ancestor context — captured once, surfaced so portable-output modes
+  // (Universal / JSX) can wrap the clone in a context-preserving div.
+  let ancestorContext = null;
+  try { ancestorContext = captureAncestorContext(originalEl, cs); } catch (e) { /* tests */ }
+
+  return { clone, extraCss, ancestorContext };
 }
 
 // =============================================================================
@@ -1604,6 +1761,7 @@ function saveToDock(el) {
     url: window.location.href,
     html: frozenHTML,
     extraCss: extraCss,
+    ancestorContext: frozen.ancestorContext || null,
     stylesheets: stylesheets,
     hasLottie: hasLottie,
     lottieData: lottieData
@@ -1669,6 +1827,7 @@ function scrapePage() {
         source, url,
         html: frozen.clone.outerHTML,
         extraCss: frozen.extraCss,
+        ancestorContext: frozen.ancestorContext || null,
         stylesheets,
         hasLottie,
         lottieData: hasLottie ? extractLottieData() : [],
@@ -1826,6 +1985,8 @@ if (typeof window !== 'undefined') {
     pxToTw, normalizeColor, radiusToTw, parseMatrix,
     generateTailwindClasses, generateInlineStyles,
     buildRuleCache, extractVariants, capturePseudos,
-    freezeElement
+    captureAncestorContext,
+    freezeElement,
+    PREFLIGHT_CSS
   };
 }

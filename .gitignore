@@ -4,6 +4,7 @@ package-lock.json
 
 # Test artifacts
 test_fixtures/
+test/fixtures/
 *.log
 .playwright/
 

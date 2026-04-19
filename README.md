@@ -192,23 +192,59 @@ whole Tailwind compiler. The engine drops:
 - Default keyword values (`object-fit: fill`, `user-select: auto`, `align-items: normal`)
 - Gap on non-flex/grid elements
 
+### Fidelity (portability) fixes — v2.1
+
+Universal- and JSX-mode copies ship with three additions so they render the
+same when pasted elsewhere:
+
+- **Minimal Tailwind preflight reset** is prepended to the traveling
+  `<style>` block. Kills `<a>` underlines, `<ul>`/`<ol>` bullets, default
+  button chrome, heading font-size cascades, and default margins that would
+  otherwise reappear on a page without its own reset.
+- **Ancestor context wrapper** — freeze captures the element's parent-chain
+  background (color + image), inherited color, and font-family. Also captures
+  the immediate parent's flex/grid layout (`display`, `gap`, `flex-direction`,
+  `grid-template-columns`, `width`). Copies wrap the captured root in up to
+  two `<div>` wrappers (`data-ed-ancestor-context`, `data-ed-parent-layout`)
+  so flex children don't collapse and dark-bg headers show the right
+  background when rendered standalone.
+- **@font-face harvest** — `buildRuleCache` scans every same-origin
+  stylesheet for `@font-face` rules, keyed by family name. After freezing,
+  the engine collects font families referenced in the clone and emits
+  matching `@font-face` rule text into `extraCss`. Fonts load from their
+  original URLs when CORS permits (Google Fonts, most CDNs do).
+
+Measured pixel-diff fidelity across 16 real-site components
+(via `test/test_fidelity.js`): **77% mean, 94–99% on well-captured cases.**
+See the [Fidelity](#fidelity) section below.
+
 ---
 
 ## Architecture
 
 ```
 easydiv/
-├── manifest.json         # MV3 manifest — options_page + devtools_page
-├── background.js         # service worker: per-tab inspector state
-├── content.js            # engine (freeze/emit) + inspector + scrapePage
-├── detector.js           # component detector (tags, ARIA, class hints, sibling clusters)
-├── popup.html / popup.js # toolbar popup UI
-├── options.html / .js    # settings (TW version + custom palette)
-├── decompiler.html / .js # CRX fetch + ZIP parser + file tree
-├── devtools.html / .js   # DevTools panel registration
-├── preview.html / .js    # full-screen preview + inline editor
-├── styles.css            # injected inspector styles
-└── test_*.js             # unit / integration / E2E suites
+├── manifest.json           # MV3 manifest (options_page + devtools_page)
+├── background.js           # service worker: per-tab inspector state
+├── content.js              # engine (freeze/emit) + inspector + scrapePage
+├── detector.js             # component detector (tags, ARIA, class hints, sibling clusters)
+├── popup.html / .js        # toolbar popup UI
+├── options.html / .js      # settings (TW version + custom palette)
+├── decompiler.html / .js   # CRX fetch + ZIP parser + file tree
+├── devtools.html / .js     # DevTools panel registration
+├── preview.html / .js      # full-screen preview + inline editor
+├── styles.css              # injected inspector styles
+├── icons/                  # 16/32/48/128 toolbar icons
+├── test/
+│   ├── test_pxToTw.js      # unit: converters + gradient parser
+│   ├── test_detector.js    # unit + jsdom integration against fixtures
+│   ├── test_e2e.js         # Playwright engine E2E (12 real sites)
+│   ├── test_extension.js   # Playwright full-extension E2E (scrape+popup+copy)
+│   ├── test_fidelity.js    # pixel-diff fidelity measurement
+│   └── fixtures/           # pinned HTML snapshots (HN, Vercel, Linear, etc.)
+├── README.md
+├── CHANGELOG.md
+└── package.json
 ```
 
 Content scripts run in the page's isolated world; engine internals are exposed
@@ -223,30 +259,84 @@ into real `class` / `style` attributes depending on which mode the user picks.
 
 ## Testing
 
-Four test tiers from fastest to most realistic:
+Five test tiers from fastest to most realistic. Run individually via
+`node test/test_<name>.js` or via the npm shortcuts:
 
 ```bash
-# 1. Pure unit tests: pxToTw, normalizeColor, parseMatrix, mediaToPrefix,
-#    splitSelectorState, parseLinearGradient  (65 assertions, <1s)
-node test_pxToTw.js
-
-# 2. Detector tests with jsdom integration against 5 real-site HTML fixtures
-#    (12 detector + fixture runs, ~1s)
-node test_detector.js
-
-# 3. Engine E2E against 5 real sites in headless Chromium via Playwright
-#    — measures capture quality, output size, empty-rate, palette hits
-node test_e2e.js
-
-# 4. Full-extension E2E: loads EasyDiv unpacked into real Chromium, runs the
-#    actual message-passing flow (scrapePage → storage → popup renders → JSX
-#    copy → clipboard), screenshots the popup  (21 checks, ~30s)
-node test_extension.js
+npm test               # unit + detector   (~1s)
+npm run test:e2e       # engine E2E across 12 real sites  (~4 min)
+npm run test:ext       # full-extension E2E on Stripe     (~30s)
+npm run test:fidelity  # pixel-diff fidelity on 16 components  (~3 min)
+npm run test:all       # everything
 ```
 
-Dependencies: `npm install` once to pull jsdom + playwright.
+What each one does:
 
-Total: **98+ assertions green, zero regressions tracked across feature batches.**
+1. **`test/test_pxToTw.js`** — 65 pure unit tests. Covers `pxToTw`,
+   `normalizeColor` (+ palette matching + alpha snap), `radiusToTw`,
+   `parseMatrix`, `mediaToPrefix` (incl. dark mode / motion / orientation),
+   `splitSelectorState`, and the linear-gradient parser.
+2. **`test/test_detector.js`** — 12 unit tests + jsdom integration against
+   5 pinned HTML fixtures (HN, Vercel, Linear, Tailwind UI, Stripe Pricing).
+   Covers type-tier dedup rules, sibling clustering, shadow-DOM traversal.
+3. **`test/test_e2e.js`** — Playwright engine E2E. Injects the engine into
+   12 real sites (Stripe, Linear, Vercel, Discord, Notion, Tailwind CSS,
+   shadcn/ui, MDN, GitHub, Spotify, YouTube, Hacker News), runs `scanPage` +
+   `freezeElement`, and prints per-site stats — palette-hit rate,
+   named-class rate, candidate count, freeze time.
+4. **`test/test_extension.js`** — Loads EasyDiv unpacked into real Chromium
+   as a persistent context. Exercises the full message flow: content scripts
+   inject, `scrapePage` runs, dock populates, popup renders, Copy dropdown
+   opens, JSX copies to clipboard. 21 assertions, plus a screenshot of the
+   popup to `/tmp/easydiv-popup.png`.
+5. **`test/test_fidelity.js`** — Pixel-diff against 16 real components:
+   screenshots the original element on the live site, reproduces the
+   captured HTML in a fresh page (with preflight + ancestor wrappers +
+   extraCss), screenshots the reproduction, and runs `pixelmatch`. Writes
+   `orig` / `reproduced` / `diff` PNGs to `/tmp/easydiv-fidelity/` so you
+   can eyeball any failure.
+
+## Fidelity
+
+Honest measured fidelity, not a marketing number. Run
+`npm run test:fidelity` to reproduce on your machine. Latest results:
+
+| Site | Component | Pixel match |
+|---|---|---|
+| Notion | button | 99.6% |
+| shadcn/ui | footer | 97.8% |
+| Vercel | footer | 97.3% |
+| Vercel | nav | 96.8% |
+| Notion | footer | 96.8% |
+| shadcn/ui | header | 95.8% |
+| Stripe | footer | 94.1% |
+| shadcn/ui | button | 89.9% |
+| shadcn/ui | nav | 88.5% |
+| Stripe | button | 87.7% |
+| Vercel | header | 81.4% |
+| Vercel | button | 75.9% |
+| Stripe | section | 74.4% |
+| Stripe | header | 55.0% |
+| Discord | header | 4.7% |
+| Discord | button | 0.8% |
+| **Mean** | | **77.3%** |
+
+Typical-case components (footers, navs, most buttons, most headers)
+reproduce at **94–99%** visual fidelity. Worst cases — elements whose
+look depends on JS-animated ancestors (Discord's starry `<canvas>`
+background, Spotify's player inner state) — fail because computed-style
+capture can't recover JS behavior.
+
+Run individually to see per-site metrics and diff images:
+```bash
+node test/test_fidelity.js
+```
+
+Dependencies: `npm install` once to pull jsdom + playwright + pixelmatch +
+pngjs. First Playwright run will also download a Chromium build.
+
+Total: **98+ assertions green + pixel-diff fidelity tracked across feature
+batches.**
 
 ---
 

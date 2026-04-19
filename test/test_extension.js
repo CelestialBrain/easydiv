@@ -9,13 +9,14 @@
 // This is the closest thing to a user hitting "Scrape Page" — it goes through
 // the actual Chrome extension runtime, not the engine in isolation.
 //
-//   node test_extension.js
+//   node test/test_extension.js
 
 const { chromium } = require('playwright');
 const path = require('path');
 const fs = require('fs');
 
-const EXT_PATH = __dirname;
+// Tests live under test/; the extension root is the parent directory.
+const EXT_PATH = path.join(__dirname, '..');
 const USER_DATA_DIR = `/tmp/easydiv-e2e-${Date.now()}`;
 const TARGET_URL = 'https://stripe.com/';
 

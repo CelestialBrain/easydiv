@@ -172,10 +172,45 @@ function renderPreview(mode) {
     iframe.srcdoc = finalDoc;
 }
 
-// Builds the final HTML payload for copy — prepends <style> block when extraCss present.
+// Minimal Tailwind-style preflight (kept in sync with content.js PREFLIGHT_CSS).
+// Prepended to Universal-mode copies so captured components render correctly in
+// destinations that don't already have a CSS reset.
+const PREFLIGHT_CSS = [
+    '*,::before,::after{box-sizing:border-box;border-width:0;border-style:solid}',
+    'html{line-height:1.5;-webkit-text-size-adjust:100%;tab-size:4}',
+    'body{margin:0;line-height:inherit}',
+    'hr{height:0;color:inherit;border-top-width:1px}',
+    'h1,h2,h3,h4,h5,h6{font-size:inherit;font-weight:inherit;margin:0}',
+    'a{color:inherit;text-decoration:inherit}',
+    'b,strong{font-weight:bolder}',
+    'small{font-size:80%}',
+    'table{text-indent:0;border-color:inherit;border-collapse:collapse}',
+    'button,input,optgroup,select,textarea{font-family:inherit;font-feature-settings:inherit;font-variation-settings:inherit;font-size:100%;font-weight:inherit;line-height:inherit;color:inherit;margin:0;padding:0}',
+    'button,select{text-transform:none}',
+    "button,[type='button'],[type='reset'],[type='submit']{-webkit-appearance:button;background-color:transparent;background-image:none}",
+    'summary{display:list-item}',
+    'blockquote,dl,dd,figure,pre{margin:0}',
+    'fieldset{margin:0;padding:0}',
+    'legend{padding:0}',
+    'ol,ul,menu{list-style:none;margin:0;padding:0}',
+    'textarea{resize:vertical}',
+    'button,[role="button"]{cursor:pointer}',
+    'img,svg,video,canvas,audio,iframe,embed,object{display:block;vertical-align:middle}',
+    'img,video{max-width:100%;height:auto}',
+    '[hidden]{display:none}'
+].join('');
+
+// Builds the final HTML payload for copy. Universal mode gets a preflight
+// prefix so it renders correctly in vanilla HTML contexts.
 function buildCopyPayload(mode) {
     const body = processHtml(stolenHTML, mode);
-    return extraCss ? `<style>${extraCss}</style>\n${body}` : body;
+    const includePreflight = (mode === 'universal');
+    const parts = [
+        includePreflight ? PREFLIGHT_CSS : '',
+        extraCss
+    ].filter(Boolean);
+    if (parts.length === 0) return body;
+    return `<style>${parts.join('\n')}</style>\n${body}`;
 }
 
 modeOriginalBtn.addEventListener('click', () => renderPreview('original'));

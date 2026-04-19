@@ -204,9 +204,39 @@ document.addEventListener("DOMContentLoaded", () => {
     // Accepts either a dock item { html, extraCss } or a raw html string.
     // Prepends a <style> block with pseudo-element / keyframe CSS when present,
     // but only for tailwind and raw modes (universal inlines everything).
+    // Build the inline-style strings for the ancestor-context wrapper and the
+    // optional parent-layout inner wrapper. Returns a render function so the
+    // caller can inject any already-transformed body HTML.
+    function ancestorContextWrapper(ctx) {
+        if (!ctx) return null;
+        const outerDecls = [];
+        if (ctx.pageBg) outerDecls.push(`background: ${ctx.pageBg}`);
+        if (ctx.color) outerDecls.push(`color: ${ctx.color}`);
+        if (ctx.fontFamily) outerDecls.push(`font-family: ${ctx.fontFamily}`);
+        const outerStyle = outerDecls.join('; ');
+
+        // Parent-layout wrapper (only when parent is flex/grid). Emits the
+        // minimal set of properties needed for a flex/grid child to lay out.
+        let innerStyle = '';
+        if (ctx.parentLayout) {
+            const pl = ctx.parentLayout;
+            const kebab = (k) => k.replace(/([A-Z])/g, '-$1').toLowerCase();
+            const decls = [];
+            for (const [k, v] of Object.entries(pl)) {
+                if (!v || v === 'normal' || v === 'none' || v === 'auto') continue;
+                decls.push(`${kebab(k)}: ${v}`);
+            }
+            innerStyle = decls.join('; ');
+        }
+
+        if (!outerStyle && !innerStyle) return null;
+        return { outerStyle, innerStyle };
+    }
+
     function processHtmlForCopy(item, mode) {
         const html = typeof item === 'string' ? item : item.html;
         const extraCss = typeof item === 'string' ? '' : (item.extraCss || '');
+        const ancestorContext = typeof item === 'string' ? null : (item.ancestorContext || null);
 
         const div = document.createElement('div');
         div.innerHTML = html;
@@ -248,21 +278,100 @@ document.addEventListener("DOMContentLoaded", () => {
 
         let body = root.outerHTML;
 
+        // Preflight — only for portable-output modes (Universal, JSX). Tailwind
+        // users already have preflight in their project; Raw-HTML users want
+        // the source unmodified. Prepended AHEAD of extraCss so pseudo/keyframe
+        // rules can still override reset defaults.
+        const includePreflight = (mode === 'universal' || mode === 'jsx');
+        const preflight = includePreflight ? getPreflightCss() : '';
+
+        // Ancestor-context wrapping — also only portable-output modes. Wraps
+        // the body in one or two divs that replicate the captured parent
+        // background / font / layout so standalone rendering matches the source.
+        const wrapInfo = includePreflight ? ancestorContextWrapper(ancestorContext) : null;
+        function applyWrapper(inner) {
+            if (!wrapInfo) return inner;
+            let out = inner;
+            if (wrapInfo.innerStyle) out = `<div data-ed-parent-layout style="${wrapInfo.innerStyle}">${out}</div>`;
+            if (wrapInfo.outerStyle) out = `<div data-ed-ancestor-context style="${wrapInfo.outerStyle}">${out}</div>`;
+            return out;
+        }
+
         // JSX mode: take the tailwind-converted DOM and rewrite it as JSX.
         if (mode === 'jsx') {
             body = htmlToJsx(root);
-            if (extraCss) {
-                const escaped = extraCss.replace(/`/g, '\\`');
+            // For JSX, wrap via string — no DOM needed. Match style={{}} syntax.
+            if (wrapInfo) {
+                const styleObj = (s) => '{{' + s.split(';').map(d => d.trim()).filter(Boolean).map(d => {
+                    const [k, ...v] = d.split(':');
+                    return `${k.trim().replace(/-([a-z])/g, (_, c) => c.toUpperCase())}: '${v.join(':').trim().replace(/'/g, "\\'")}'`;
+                }).join(', ') + '}}';
+                if (wrapInfo.innerStyle) body = `<div style=${styleObj(wrapInfo.innerStyle)}>\n${body}\n</div>`;
+                if (wrapInfo.outerStyle) body = `<div style=${styleObj(wrapInfo.outerStyle)}>\n${body}\n</div>`;
+            }
+            const cssBlob = [preflight, extraCss].filter(Boolean).join('\n');
+            if (cssBlob) {
+                const escaped = cssBlob.replace(/`/g, '\\`');
                 return `<>\n<style>{\`${escaped}\`}</style>\n${body}\n</>`;
             }
             return body;
         }
 
-        if (extraCss && (mode === 'tailwind' || mode === 'universal' || mode === 'raw')) {
-            return `<style>${extraCss}</style>\n${body}`;
+        const cssBlob = [preflight, extraCss].filter(Boolean).join('\n');
+        const wrapped = applyWrapper(body);
+        if (cssBlob && (mode === 'tailwind' || mode === 'universal' || mode === 'raw')) {
+            return `<style>${cssBlob}</style>\n${wrapped}`;
         }
-        return body;
+        return wrapped;
     }
+
+    // Resolve the preflight CSS string. The engine exposes it on
+    // `window.__easyDivEngine` in the captured page; we fetch it via a
+    // roundtrip cache since this popup runs in its own isolated context.
+    let _preflightCache = null;
+    function getPreflightCss() {
+        if (_preflightCache !== null) return _preflightCache;
+        _preflightCache = PREFLIGHT_CSS_LOCAL;
+        return _preflightCache;
+    }
+
+    // Inline copy of the preflight so popup.js works standalone without
+    // reaching into the content script's isolated world. Keep in sync with
+    // content.js PREFLIGHT_CSS — changes there should mirror here.
+    const PREFLIGHT_CSS_LOCAL = [
+        '*,::before,::after{box-sizing:border-box;border-width:0;border-style:solid}',
+        'html{line-height:1.5;-webkit-text-size-adjust:100%;tab-size:4}',
+        'body{margin:0;line-height:inherit}',
+        'hr{height:0;color:inherit;border-top-width:1px}',
+        'abbr:where([title]){text-decoration:underline dotted}',
+        'h1,h2,h3,h4,h5,h6{font-size:inherit;font-weight:inherit;margin:0}',
+        'a{color:inherit;text-decoration:inherit}',
+        'b,strong{font-weight:bolder}',
+        'small{font-size:80%}',
+        'table{text-indent:0;border-color:inherit;border-collapse:collapse}',
+        'button,input,optgroup,select,textarea{font-family:inherit;font-feature-settings:inherit;font-variation-settings:inherit;font-size:100%;font-weight:inherit;line-height:inherit;color:inherit;margin:0;padding:0}',
+        'button,select{text-transform:none}',
+        "button,[type='button'],[type='reset'],[type='submit']{-webkit-appearance:button;background-color:transparent;background-image:none}",
+        ':-moz-focusring{outline:auto}',
+        ':-moz-ui-invalid{box-shadow:none}',
+        'progress{vertical-align:baseline}',
+        '::-webkit-inner-spin-button,::-webkit-outer-spin-button{height:auto}',
+        "[type='search']{-webkit-appearance:textfield;outline-offset:-2px}",
+        '::-webkit-search-decoration{-webkit-appearance:none}',
+        '::-webkit-file-upload-button{-webkit-appearance:button;font:inherit}',
+        'summary{display:list-item}',
+        'blockquote,dl,dd,figure,pre{margin:0}',
+        'fieldset{margin:0;padding:0}',
+        'legend{padding:0}',
+        'ol,ul,menu{list-style:none;margin:0;padding:0}',
+        'textarea{resize:vertical}',
+        'input::placeholder,textarea::placeholder{opacity:1;color:#9ca3af}',
+        'button,[role="button"]{cursor:pointer}',
+        ':disabled{cursor:default}',
+        'img,svg,video,canvas,audio,iframe,embed,object{display:block;vertical-align:middle}',
+        'img,video{max-width:100%;height:auto}',
+        '[hidden]{display:none}'
+    ].join('');
 
     // =========================================================================
     // HTML → JSX converter

@@ -4,7 +4,7 @@
 const fs = require('fs');
 const path = require('path');
 const { JSDOM } = require('jsdom');
-const { scanPage, TYPE, _internal } = require('./detector.js');
+const { scanPage, TYPE, _internal } = require('../detector.js');
 
 // ---------- unit tests for internal helpers ----------
 let unitPass = 0, unitFail = 0;
@@ -85,11 +85,11 @@ assert('lowercases', _internal.normalizeClassToken('Nav'), 'nav');
 // ---------- integration tests against real HTML ----------
 
 const FIXTURES = [
-  { name: 'Hacker News',    file: 'test_fixtures/hn.html' },
-  { name: 'Vercel',         file: 'test_fixtures/vercel.html' },
-  { name: 'Linear',         file: 'test_fixtures/linear.html' },
-  { name: 'Tailwind UI',    file: 'test_fixtures/tailwindui.html' },
-  { name: 'Stripe Pricing', file: 'test_fixtures/stripe-pricing.html' }
+  { name: 'Hacker News',    file: 'fixtures/hn.html' },
+  { name: 'Vercel',         file: 'fixtures/vercel.html' },
+  { name: 'Linear',         file: 'fixtures/linear.html' },
+  { name: 'Tailwind UI',    file: 'fixtures/tailwindui.html' },
+  { name: 'Stripe Pricing', file: 'fixtures/stripe-pricing.html' }
 ];
 
 console.log('\n== detector against real-world HTML ==\n');

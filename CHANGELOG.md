@@ -2,6 +2,81 @@
 
 All notable changes to EasyDiv. Versions follow [SemVer](https://semver.org/).
 
+## [2.1.0] — 2026-04
+
+Fidelity release. Brings measured pixel-parity from 72.8% → 77.3% across 16
+real-site components, with typical-case components hitting 94–99%. Adds a
+pixel-diff test harness to keep the number honest.
+
+### Added
+
+- **Preflight reset prefix** — minimal Tailwind-style reset (~1.7 KB)
+  prepended to the traveling `<style>` block in Universal + JSX copy modes.
+  Kills `<a>` underlines, list bullets, default button chrome, heading
+  font-size cascades, and default margins. Not emitted in Tailwind or raw
+  modes (those already have their own resets). Exposed as
+  `window.__easyDivEngine.PREFLIGHT_CSS`. Biggest single fidelity win:
+  Notion button 82% → 99%, Stripe button 71% → 88%.
+- **Ancestor context capture** — `captureAncestorContext(el, getCs)` walks
+  from the captured element's parent up toward `documentElement`, collecting
+  (a) first opaque background (color + image), (b) first inherited color,
+  (c) first inherited font-family, (d) immediate parent's flex/grid layout
+  (`display`, `flexDirection`, `flexWrap`, `justifyContent`, `alignItems`,
+  `gap`, `gridTemplateColumns`, `gridTemplateRows`, `width`). Returned as
+  a third field from `freezeElement` and from `scrapePage` dock items.
+  Universal + JSX modes wrap the clone in up to two context divs
+  (`data-ed-ancestor-context` outer, `data-ed-parent-layout` inner) so
+  dark-bg headers render correctly and flex children don't collapse when
+  reproduced standalone.
+- **@font-face harvest** — `buildRuleCache` now collects `@font-face` rules
+  keyed by family name. `freezeElement` scans the clone's `data-inline-style`
+  for used font-family values and emits matching rule cssText into `extraCss`.
+  Original `url()` references are preserved (no inline base64 — avoids an
+  async freeze refactor). Works when the destination can fetch the URLs
+  (same origin, or CORS-permissive font CDNs like Google Fonts).
+- **Negative-value class bug fix** — `-bottom-[120px]` instead of the
+  malformed `bottom--[120px]` for negative computed spacings. Caught during
+  YouTube E2E capture where positioned overlays use negative bottoms.
+- **New test: `test/test_fidelity.js`** — pixel-diff harness. For 16
+  components across 5 sites: screenshots the original element, reproduces
+  the captured HTML in a fresh page (with preflight + ancestor wrappers +
+  extraCss), screenshots the reproduction, compares via `pixelmatch`, and
+  writes `orig`/`reproduced`/`diff` PNGs to `/tmp/easydiv-fidelity/` for
+  manual inspection. Dependencies: `pixelmatch@7` (ESM-only, loaded via
+  dynamic import) + `pngjs@7`.
+- **Expanded `test/test_e2e.js`** — now covers 12 sites (added Spotify,
+  YouTube, GitHub, Notion, Discord, shadcn/ui, MDN) with new per-site
+  quality metrics: palette-hit rate, named-class rate, shadow-host count.
+  Prints a compact summary table at the end of the run.
+
+### Changed
+
+- **File structure** — test files moved from root to `test/`.
+  `test_fixtures/` renamed to `test/fixtures/`. Keeps the root at 15 files
+  instead of 20. All paths in `package.json` scripts and test files updated.
+  Run via `npm test`, `npm run test:e2e`, `npm run test:ext`,
+  `npm run test:fidelity`, or `npm run test:all`.
+- **Arbitrary-value escaping** — `pxToTw` and `normalizeColor` now
+  underscore-escape whitespace in arbitrary values (`gap-[normal_24px]` not
+  `gap-[normal 24px]`, `text-[lab(...)]` preserved with underscores) so
+  Tailwind JIT accepts them.
+
+### Fidelity results (`test/test_fidelity.js`, mean pixel match)
+
+| Measurement | Score |
+|---|---|
+| Baseline (pre-v2.1) | 72.8% |
+| + preflight reset | 77.0% |
+| + ancestor context | 77.1% |
+| + @font-face harvest | 77.3% |
+
+Typical-case components (footers, navs, most buttons): **94–99%**.
+Worst cases (Discord — JS-animated canvas ancestors): **<5%** — these fail
+because computed-style capture can't recover JS-driven behavior, a
+fundamental limit of the snapshot approach shared with every competitor.
+
+---
+
 ## [2.0.0] — 2026-04
 
 **Major release.** Complete engine rewrite, auto-scraping pipeline, decompiler,

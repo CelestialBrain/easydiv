@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Test artifacts
+test_fixtures/
+*.log
+.playwright/
+
+# Ephemeral output from E2E runs
+/tmp/easydiv-*
+
+# Editor / OS cruft
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Extension packaging output
+*.crx
+*.pem
+*.zip
+
+# Build artifacts (none currently, future-proofing)
+dist/
+build/

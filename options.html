@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>EasyDiv — Settings</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-0: #0a0a0a;
+            --bg-1: #121214;
+            --bg-2: #18181b;
+            --bg-3: #27272a;
+            --border-0: #1f1f22;
+            --border-1: #2a2a2e;
+            --border-2: #3f3f46;
+            --text-0: #ededed;
+            --text-1: #a1a1aa;
+            --text-2: #71717a;
+            --text-3: #52525b;
+            --accent: #22c55e;
+            --accent-dim: rgba(34, 197, 94, 0.12);
+            --accent-border: rgba(34, 197, 94, 0.3);
+            --accent-bright: #4ade80;
+            --danger: #ef4444;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html, body { height: 100%; }
+
+        body {
+            font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+            background: var(--bg-0);
+            color: var(--text-0);
+            padding: 48px 24px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 760px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 32px;
+        }
+
+        h1 {
+            font-size: 22px;
+            font-weight: 600;
+            letter-spacing: -0.02em;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        h1 .logo {
+            width: 22px; height: 22px;
+            background: var(--bg-2);
+            border: 1px solid var(--border-2);
+            border-radius: 6px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--accent);
+        }
+        h2 { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+        p, label { color: var(--text-1); font-size: 13px; }
+        .subtitle { color: var(--text-2); margin-bottom: 0; }
+
+        .section {
+            padding: 20px;
+            background: var(--bg-1);
+            border: 1px solid var(--border-0);
+            border-radius: 10px;
+        }
+
+        .hint {
+            margin-top: 6px;
+            font-size: 12px;
+            color: var(--text-2);
+        }
+        .hint code {
+            font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+            background: var(--bg-2);
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-size: 11px;
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 260px;
+            padding: 12px 14px;
+            background: var(--bg-2);
+            border: 1px solid var(--border-1);
+            border-radius: 8px;
+            color: var(--text-0);
+            font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+            font-size: 12px;
+            line-height: 1.55;
+            resize: vertical;
+            outline: none;
+            transition: border-color 0.15s ease;
+        }
+        textarea:focus { border-color: var(--accent-border); }
+
+        .row { display: flex; gap: 10px; align-items: center; margin-top: 14px; }
+
+        button {
+            padding: 8px 14px;
+            border: 1px solid var(--border-1);
+            background: var(--bg-2);
+            color: var(--text-0);
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            font-family: inherit;
+            transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+        }
+        button:hover {
+            background: var(--bg-3);
+            border-color: var(--border-2);
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #052e16;
+            font-weight: 600;
+        }
+        .btn-primary:hover {
+            background: var(--accent-bright);
+            border-color: var(--accent-bright);
+            color: #052e16;
+        }
+
+        .btn-ghost {
+            background: transparent;
+            border-color: transparent;
+            color: var(--text-2);
+        }
+        .btn-ghost:hover { color: var(--text-0); background: var(--bg-2); }
+
+        .status {
+            font-size: 12px;
+            color: var(--text-2);
+            margin-left: auto;
+        }
+        .status.ok { color: var(--accent-bright); }
+        .status.err { color: #fca5a5; }
+
+        .palette-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 8px;
+            margin-top: 14px;
+            max-height: 340px;
+            overflow-y: auto;
+            padding: 4px;
+        }
+        .palette-chip {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 8px;
+            background: var(--bg-2);
+            border: 1px solid var(--border-1);
+            border-radius: 6px;
+            font-size: 11px;
+            color: var(--text-1);
+            font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+        }
+        .palette-swatch {
+            width: 14px; height: 14px;
+            border-radius: 3px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            flex-shrink: 0;
+        }
+        .palette-empty {
+            color: var(--text-3);
+            font-size: 12px;
+            text-align: center;
+            padding: 24px;
+            border: 1px dashed var(--border-1);
+            border-radius: 6px;
+            margin-top: 14px;
+        }
+
+        details {
+            margin-top: 12px;
+        }
+        details summary {
+            cursor: pointer;
+            font-size: 12px;
+            color: var(--text-2);
+            padding: 4px 0;
+        }
+        details summary:hover { color: var(--text-0); }
+        details pre {
+            background: var(--bg-2);
+            border: 1px solid var(--border-0);
+            border-radius: 6px;
+            padding: 12px;
+            margin-top: 8px;
+            font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+            font-size: 11px;
+            line-height: 1.55;
+            color: var(--text-1);
+            overflow-x: auto;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div>
+            <h1>
+                <span class="logo">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                        <line x1="9" y1="3" x2="9" y2="21" />
+                    </svg>
+                </span>
+                EasyDiv settings
+            </h1>
+            <p class="subtitle">Configure custom colors and extraction behavior.</p>
+        </div>
+
+        <section class="section">
+            <h2>Tailwind version</h2>
+            <p class="hint">Controls which token names are emitted. v4 renames several defaults
+            (<code>shadow</code> → <code>shadow-sm</code>, <code>bg-gradient-to-r</code> → <code>bg-linear-to-r</code>, etc.).
+            Most class names are identical in both; this only affects the ones that diverged.</p>
+            <div class="row" style="margin-top: 10px; gap: 16px;">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                    <input type="radio" name="tw-version" value="v3" id="tw-v3"> Tailwind v3 (default)
+                </label>
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                    <input type="radio" name="tw-version" value="v4" id="tw-v4"> Tailwind v4
+                </label>
+                <span id="tw-version-status" class="status"></span>
+            </div>
+        </section>
+
+        <section class="section">
+            <h2>Custom color palette</h2>
+            <p class="hint">
+                Paste your <code>tailwind.config.js</code> colors so captures map to <code>bg-primary</code> / <code>text-brand-500</code> instead of arbitrary rgb values.
+                Accepts JSON, or the <code>colors:</code> block from a Tailwind config.
+            </p>
+
+            <textarea id="config-input" placeholder='{
+  "primary": "#3b82f6",
+  "brand": {
+    "50":  "#eff6ff",
+    "500": "#3b82f6",
+    "900": "#1e3a8a"
+  }
+}'></textarea>
+
+            <details>
+                <summary>Example: pasted directly from tailwind.config.js</summary>
+                <pre>colors: {
+  primary: '#3b82f6',
+  brand: {
+    DEFAULT: '#3b82f6',
+    light: '#bfdbfe',
+    dark: '#1e40af'
+  }
+}</pre>
+            </details>
+
+            <div class="row">
+                <button id="save" class="btn-primary">Save palette</button>
+                <button id="reset" class="btn-ghost">Reset to defaults</button>
+                <span id="status" class="status"></span>
+            </div>
+
+            <h2 style="margin-top: 24px;">Detected colors</h2>
+            <div id="palette-preview" class="palette-empty">No custom palette loaded — Tailwind v3 defaults will be used.</div>
+        </section>
+    </div>
+
+    <script src="options.js"></script>
+</body>
+
+</html>

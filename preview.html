@@ -6,16 +6,29 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EasyDiv Preview</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        :root {
+            --bg-0: #0a0a0a;
+            --bg-1: #121214;
+            --bg-2: #18181b;
+            --bg-3: #27272a;
+            --border-0: #1f1f22;
+            --border-1: #2a2a2e;
+            --border-2: #3f3f46;
+            --text-0: #ededed;
+            --text-1: #a1a1aa;
+            --text-2: #71717a;
+            --accent: #22c55e;
+            --accent-dim: rgba(34, 197, 94, 0.12);
+            --accent-border: rgba(34, 197, 94, 0.3);
+            --accent-bright: #4ade80;
         }
 
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
         body {
-            font-family: system-ui, -apple-system, sans-serif;
-            background: #09090b;
-            color: #fafafa;
+            font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+            background: var(--bg-0);
+            color: var(--text-0);
             min-height: 100vh;
         }
 
@@ -24,11 +37,10 @@
             top: 0;
             left: 0;
             right: 0;
-            height: 50px;
-            background: rgba(9, 9, 11, 0.98);
-            backdrop-filter: blur(10px);
-            border-bottom: 1px solid #27272a;
-            padding: 0 24px;
+            height: 48px;
+            background: var(--bg-0);
+            border-bottom: 1px solid var(--border-0);
+            padding: 0 20px;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -38,99 +50,160 @@
         .toolbar-left {
             display: flex;
             align-items: center;
-            gap: 16px;
+            gap: 14px;
         }
 
         .toolbar h1 {
-            font-size: 15px;
+            font-size: 13px;
             font-weight: 600;
+            color: var(--text-0);
+            letter-spacing: -0.01em;
         }
 
-        .toolbar h1 .logo {
-            background: linear-gradient(135deg, #8b5cf6, #a78bfa);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
+        .toolbar h1 .logo { color: var(--accent); }
 
         .source-badge {
             font-size: 11px;
-            color: #8b5cf6;
-            background: rgba(139, 92, 246, 0.1);
-            padding: 4px 10px;
+            color: var(--text-1);
+            background: var(--bg-2);
+            padding: 3px 8px;
             border-radius: 4px;
-            border: 1px solid rgba(139, 92, 246, 0.2);
+            border: 1px solid var(--border-1);
+            font-weight: 500;
         }
 
-        .toolbar-right {
-            display: flex;
-            gap: 8px;
-        }
+        .toolbar-right { display: flex; gap: 8px; }
 
         .btn {
-            padding: 6px 14px;
-            border: none;
+            padding: 6px 12px;
+            border: 1px solid var(--border-1);
+            background: var(--bg-2);
+            color: var(--text-1);
             border-radius: 5px;
             font-size: 12px;
             font-weight: 500;
             cursor: pointer;
-            transition: all 0.2s ease;
+            transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+            font-family: inherit;
         }
 
         .btn:hover {
-            transform: translateY(-1px);
+            background: var(--bg-3);
+            border-color: var(--border-2);
+            color: var(--text-0);
         }
 
         .btn-primary {
-            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
-            color: white;
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #052e16;
+            font-weight: 600;
+        }
+        .btn-primary:hover {
+            background: var(--accent-bright);
+            border-color: var(--accent-bright);
+            color: #052e16;
         }
 
         .btn-secondary {
-            background: #27272a;
-            color: #a1a1aa;
-            border: 1px solid #3f3f46;
-        }
-
-        .btn-secondary:hover {
-            background: #3f3f46;
-            color: #fafafa;
+            background: var(--bg-2);
+            color: var(--text-1);
+            border: 1px solid var(--border-1);
         }
 
         #canvas {
             position: fixed;
-            top: 50px;
+            top: 48px;
             left: 0;
             width: 100%;
-            height: calc(100vh - 50px);
+            height: calc(100vh - 48px);
             border: none;
-            background: white;
+            background: #ffffff;
         }
 
         .mode-switch {
             display: flex;
-            background: #27272a;
+            background: var(--bg-2);
+            border: 1px solid var(--border-1);
             border-radius: 6px;
             padding: 2px;
-            margin-right: 16px;
+            margin-right: 12px;
         }
 
         .mode-btn {
             background: transparent;
             border: none;
-            color: #71717a;
-            padding: 4px 12px;
+            color: var(--text-2);
+            padding: 4px 10px;
             font-size: 11px;
             font-weight: 500;
             border-radius: 4px;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: background 0.12s ease, color 0.12s ease;
+            font-family: inherit;
         }
 
+        .mode-btn:hover { color: var(--text-0); }
+
         .mode-btn.active {
-            background: #3f3f46;
-            color: white;
-            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+            background: var(--accent-dim);
+            color: var(--accent-bright);
         }
+
+        /* ---- Editor panel (slides in from top when Edit is clicked) ---- */
+        #editor-panel {
+            position: fixed;
+            top: 48px;
+            left: 0;
+            right: 0;
+            height: 40vh;
+            min-height: 240px;
+            background: var(--bg-1);
+            border-bottom: 1px solid var(--border-0);
+            display: none;
+            flex-direction: column;
+            z-index: 999;
+        }
+        #editor-panel.active { display: flex; }
+        #editor-panel .editor-head {
+            padding: 8px 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-bottom: 1px solid var(--border-0);
+            flex-shrink: 0;
+        }
+        #editor-panel .editor-title {
+            font-size: 12px;
+            color: var(--text-1);
+            font-weight: 500;
+        }
+        #editor-panel .editor-hint {
+            font-size: 11px;
+            color: var(--text-3);
+            margin-left: 6px;
+        }
+        #editor-panel .editor-actions {
+            margin-left: auto;
+            display: flex;
+            gap: 6px;
+        }
+        #editor-panel textarea {
+            flex: 1;
+            width: 100%;
+            padding: 12px 14px;
+            background: var(--bg-0);
+            border: none;
+            color: var(--text-0);
+            font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+            font-size: 12px;
+            line-height: 1.55;
+            resize: none;
+            outline: none;
+        }
+
+        /* Shift canvas down when editor is open */
+        body.editor-open #canvas { top: calc(48px + 40vh); height: calc(100vh - 48px - 40vh); min-height: 200px; }
     </style>
 </head>
 
@@ -144,10 +217,25 @@
             <div class="mode-switch">
                 <button class="mode-btn active" id="mode-original">Original</button>
                 <button class="mode-btn" id="mode-tailwind">Tailwind</button>
+                <button class="mode-btn" id="mode-universal">Universal</button>
             </div>
+            <button class="btn" id="edit-btn">Edit</button>
             <button class="btn btn-primary" id="copy-btn">Copy HTML</button>
             <button class="btn btn-secondary" id="back-btn">Back</button>
         </div>
+    </div>
+
+    <div id="editor-panel">
+        <div class="editor-head">
+            <span class="editor-title">Raw HTML editor</span>
+            <span class="editor-hint">edits show in the preview below · save writes back to the dock</span>
+            <div class="editor-actions">
+                <button class="btn" id="editor-apply">Apply to preview</button>
+                <button class="btn btn-primary" id="editor-save">Save to dock</button>
+                <button class="btn btn-secondary" id="editor-close">Close</button>
+            </div>
+        </div>
+        <textarea id="editor-textarea" spellcheck="false" placeholder="Raw HTML — tweak classes, strip elements, pick a different ancestor…"></textarea>
     </div>
 
     <iframe id="canvas"></iframe>

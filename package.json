@@ -1,0 +1,40 @@
+{
+  "name": "easydiv",
+  "version": "2.0.0",
+  "description": "Chrome extension that scrapes UI components from any site as Tailwind CSS, inline styles, or React/JSX. Auto-detects components page-wide. Open source, local-only, no AI.",
+  "main": "background.js",
+  "scripts": {
+    "test": "node test_pxToTw.js && node test_detector.js",
+    "test:e2e": "node test_e2e.js",
+    "test:ext": "node test_extension.js",
+    "test:all": "npm run test && npm run test:e2e && npm run test:ext"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CelestialBrain/easydiv.git"
+  },
+  "keywords": [
+    "chrome-extension",
+    "tailwindcss",
+    "tailwind",
+    "css",
+    "html",
+    "jsx",
+    "react",
+    "devtools",
+    "scraper",
+    "ui-components",
+    "design-extraction"
+  ],
+  "author": "",
+  "license": "MIT",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/CelestialBrain/easydiv/issues"
+  },
+  "homepage": "https://github.com/CelestialBrain/easydiv#readme",
+  "devDependencies": {
+    "jsdom": "^29.0.2",
+    "playwright": "^1.59.1"
+  }
+}

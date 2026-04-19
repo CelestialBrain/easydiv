@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>EasyDiv — Extension Inspector</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-0: #0a0a0a;
+            --bg-1: #121214;
+            --bg-2: #18181b;
+            --bg-3: #27272a;
+            --border-0: #1f1f22;
+            --border-1: #2a2a2e;
+            --border-2: #3f3f46;
+            --text-0: #ededed;
+            --text-1: #a1a1aa;
+            --text-2: #71717a;
+            --text-3: #52525b;
+            --accent: #22c55e;
+            --accent-dim: rgba(34, 197, 94, 0.12);
+            --accent-border: rgba(34, 197, 94, 0.3);
+            --accent-bright: #4ade80;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        html, body { height: 100%; }
+
+        body {
+            font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+            background: var(--bg-0);
+            color: var(--text-0);
+            font-size: 13px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        header {
+            padding: 14px 20px;
+            border-bottom: 1px solid var(--border-0);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-shrink: 0;
+        }
+
+        header h1 {
+            font-size: 14px;
+            font-weight: 600;
+            letter-spacing: -0.01em;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+        }
+        header h1 .logo {
+            width: 22px; height: 22px;
+            background: var(--bg-2);
+            border: 1px solid var(--border-2);
+            border-radius: 6px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--accent);
+        }
+        header .subtitle {
+            font-size: 12px;
+            color: var(--text-2);
+            font-weight: 400;
+            margin-left: 4px;
+        }
+        header input {
+            flex: 1;
+            min-width: 0;
+            padding: 8px 12px;
+            background: var(--bg-2);
+            border: 1px solid var(--border-1);
+            border-radius: 6px;
+            color: var(--text-0);
+            font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+            font-size: 12px;
+            outline: none;
+            transition: border-color 0.12s ease;
+        }
+        header input:focus { border-color: var(--accent-border); }
+
+        button {
+            padding: 8px 14px;
+            border: 1px solid var(--border-1);
+            background: var(--bg-2);
+            color: var(--text-0);
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            font-family: inherit;
+            transition: background 0.12s ease, border-color 0.12s ease;
+            white-space: nowrap;
+        }
+        button:hover { background: var(--bg-3); border-color: var(--border-2); }
+        button.primary {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #052e16;
+            font-weight: 600;
+        }
+        button.primary:hover {
+            background: var(--accent-bright);
+            border-color: var(--accent-bright);
+        }
+
+        #status {
+            padding: 8px 20px;
+            font-size: 12px;
+            color: var(--text-2);
+            border-bottom: 1px solid var(--border-0);
+            flex-shrink: 0;
+            min-height: 32px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        #status.err { color: #fca5a5; }
+        #status.ok { color: var(--accent-bright); }
+
+        main {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        #tree {
+            overflow: auto;
+            padding: 10px 6px;
+            border-right: 1px solid var(--border-0);
+            background: var(--bg-0);
+            font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+            font-size: 12px;
+            scrollbar-width: thin;
+            scrollbar-color: var(--border-2) transparent;
+        }
+        #tree::-webkit-scrollbar { width: 6px; }
+        #tree::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 3px; }
+
+        .tree-node {
+            padding: 3px 10px;
+            color: var(--text-1);
+            cursor: pointer;
+            border-radius: 3px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .tree-node:hover { background: var(--bg-2); color: var(--text-0); }
+        .tree-node.active { background: var(--accent-dim); color: var(--accent-bright); }
+        .tree-node.folder { color: var(--text-2); font-weight: 500; }
+        .tree-size {
+            float: right;
+            color: var(--text-3);
+            font-size: 10px;
+            font-weight: 400;
+            margin-left: 12px;
+        }
+
+        #viewer-wrap {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            overflow: hidden;
+        }
+
+        #viewer-header {
+            padding: 10px 16px;
+            border-bottom: 1px solid var(--border-0);
+            font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+            font-size: 12px;
+            color: var(--text-1);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-shrink: 0;
+        }
+        #viewer-header .pill {
+            font-size: 10px;
+            padding: 1px 6px;
+            border-radius: 3px;
+            background: var(--bg-2);
+            border: 1px solid var(--border-1);
+            color: var(--text-2);
+        }
+        #viewer-header button {
+            margin-left: auto;
+            padding: 4px 10px;
+            font-size: 11px;
+        }
+
+        #viewer {
+            flex: 1;
+            overflow: auto;
+            padding: 16px;
+            background: var(--bg-0);
+            font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+            font-size: 12px;
+            line-height: 1.5;
+            color: var(--text-1);
+            white-space: pre;
+            scrollbar-width: thin;
+            scrollbar-color: var(--border-2) transparent;
+        }
+        #viewer::-webkit-scrollbar { width: 6px; height: 6px; }
+        #viewer::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 3px; }
+
+        .viewer-empty {
+            color: var(--text-3);
+            font-family: 'Inter', system-ui, sans-serif;
+            font-size: 13px;
+            text-align: center;
+            padding: 40px;
+            white-space: normal;
+        }
+
+        .summary {
+            background: var(--bg-1);
+            border: 1px solid var(--border-0);
+            border-radius: 8px;
+            padding: 14px 16px;
+            margin-bottom: 16px;
+            font-family: 'Inter', system-ui, sans-serif;
+            white-space: normal;
+        }
+        .summary h3 { font-size: 14px; margin-bottom: 4px; color: var(--text-0); }
+        .summary-line { font-size: 12px; color: var(--text-1); margin-top: 4px; }
+        .summary-line strong { color: var(--text-0); font-weight: 500; }
+        .summary-tag {
+            display: inline-block;
+            font-size: 10px;
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--bg-2);
+            border: 1px solid var(--border-1);
+            color: var(--text-1);
+            padding: 1px 6px;
+            border-radius: 3px;
+            margin-right: 4px;
+            margin-top: 4px;
+        }
+        .summary-tag.warn { border-color: rgba(251, 146, 60, 0.3); color: #fdba74; }
+
+        .hint {
+            color: var(--text-3);
+            font-size: 11px;
+        }
+
+        .warning-banner {
+            padding: 10px 16px;
+            background: rgba(251, 146, 60, 0.08);
+            border-bottom: 1px solid rgba(251, 146, 60, 0.2);
+            font-size: 11px;
+            color: #fdba74;
+            flex-shrink: 0;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>
+            <span class="logo">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+                </svg>
+            </span>
+            Extension Inspector
+            <span class="subtitle">decompile any Chrome extension</span>
+        </h1>
+        <input id="id-input" placeholder="Chrome Web Store URL or extension ID" spellcheck="false">
+        <button id="fetch" class="primary">Fetch</button>
+    </header>
+    <div class="warning-banner">
+        For research and educational use only. Extensions downloaded here are subject to their own licenses;
+        reuse their code responsibly.
+    </div>
+    <div id="status">Paste an extension ID (32 lowercase letters) or a Chrome Web Store URL and press Fetch.</div>
+
+    <main>
+        <div id="tree">
+            <div class="hint" style="padding: 10px 14px;">No extension loaded.</div>
+        </div>
+        <div id="viewer-wrap">
+            <div id="viewer-header" style="display:none;">
+                <span id="viewer-path"></span>
+                <span class="pill" id="viewer-size"></span>
+                <button id="viewer-copy">Copy</button>
+            </div>
+            <div id="viewer">
+                <div class="viewer-empty">Select a file in the tree on the left to view its contents.</div>
+            </div>
+        </div>
+    </main>
+
+    <script src="decompiler.js"></script>
+</body>
+
+</html>

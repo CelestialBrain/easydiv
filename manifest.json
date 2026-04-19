@@ -1,8 +1,8 @@
 {
     "manifest_version": 3,
     "name": "EasyDiv - Design Stealer",
-    "version": "1.2.0",
-    "description": "Steal any UI component with Tailwind CSS classes",
+    "version": "2.0.0",
+    "description": "Scrape any UI component as Tailwind, inline CSS, or JSX. Auto-detect whole pages. Inspect other extensions. Open source.",
     "permissions": [
         "activeTab",
         "scripting",
@@ -30,12 +30,15 @@
     "background": {
         "service_worker": "background.js"
     },
+    "devtools_page": "devtools.html",
+    "options_page": "options.html",
     "content_scripts": [
         {
             "matches": [
                 "<all_urls>"
             ],
             "js": [
+                "detector.js",
                 "content.js"
             ],
             "css": [
